@@ -5,7 +5,8 @@
 import * as C from "./calcul.js";
 import * as S from "./stockage.js";
 
-const VERSION = "1.00"; // ⚠️ le même n° est dans sw.js (CACHE) et dans le nom du zip : un test le vérifie.
+const VERSION = "1.01"; // v1.01 — ⚠️ le même n° est dans sw.js (CACHE) et dans le nom du zip : un test le vérifie.
+const ADRESSE_APPLI = "https://ma-compta-perso.github.io/"; // v1.01 — l'adresse publique, la même que dans le QR code icones/qr-ma-compta.svg
 const COULEUR_BARRE = { clair: "#f2f4f3", sombre: "#121619" }; // couleur de la barre du téléphone (comme le fond)
 const ICONES_COMPTE = ["🏦", "💳", "🐷", "👛", "💶", "🏠", "💼", "⭐"];
 const ICONES_CATEGORIE = ["🛒", "🍽️", "☕", "🚗", "⛽", "🚌", "🏠", "⚡", "📶", "🩺", "💊", "👕", "🎬", "🏇", "🏆", "🎮", "📺", "✈️", "📚", "👶", "🐾", "🎁", "🧾", "🔧", "💇", "🍷", "🚬", "💼", "💰", "❓"];
@@ -43,6 +44,7 @@ const etat = {
   installation: null, // l'invitation à installer, gardée pour le bouton « Installer »
   majEnAttente: null, // une nouvelle version prête à s'activer
   majDemandee: false,
+  majReportee: false, // v1.01 — « Plus tard » : le bandeau se cache jusqu'à la prochaine ouverture de l'appli
   copieRestauration: false, // une copie de sécurité d'avant restauration existe
   persistant: null,
   erreurs: [],
@@ -339,8 +341,8 @@ function rappelSauvegarde() {
 
 function rendreBandeaux() {
   const b = [];
-  if (etat.majEnAttente) {
-    b.push(`<div class="bandeau"><p>Une nouvelle version de l'appli est prête.</p><button type="button" class="btn btn-principal" data-action="mettre-a-jour">Mettre à jour</button></div>`);
+  if (etat.majEnAttente && !etat.majReportee) { // v1.01 — « Plus tard » cache le bandeau pour cette fois
+    b.push(`<div class="bandeau"><p>Une nouvelle version de l'appli est prête.</p><button type="button" class="btn" data-action="plus-tard">Plus tard</button><button type="button" class="btn btn-principal" data-action="mettre-a-jour">Mettre à jour</button></div>`); // v1.01 — bouton « Plus tard »
   }
   if (etat.meta && etat.vue === "accueil") {
     if (etat.meta.exemple) {
@@ -573,6 +575,7 @@ function vueReglages() {
   <div>
   <section class="section"><h2>Comptes</h2><div class="bloc">${comptes}${boutonReglage("ajouter-compte", "➕", "Ajouter un compte", "livret, espèces, autre banque…")}</div></section>
   <section class="section"><h2>Catégories</h2><div class="bloc">${boutonReglage("gerer-categories", "🏷️", "Gérer les catégories", "renommer, ajouter, archiver")}</div></section>
+  <section class="section"><h2>Partager l'appli</h2><div class="bloc">${boutonReglage("ouvrir-partage", "🤝", "Envoyer l'appli à un proche", "un message tout prêt, ou un QR code à scanner")}</div></section><!-- v1.01 — 🤝 et pas 📤 : à ne pas confondre avec « Partager la sauvegarde », qui contient vos chiffres -->
   <section class="section"><h2>Sauvegarde</h2>
     <div class="bloc">
       <div class="reglage"><p>${esc(derniere)}</p><p class="petit doux">Si l'appareil est perdu ou cassé, seules vos sauvegardes gardent vos chiffres. Rangez-les en lieu sûr (Drive, mail…), jamais en lien public.</p></div>
@@ -654,7 +657,7 @@ function rendreCalque() {
   }
   calque.hidden = false;
   calque.inert = false;
-  const ecrans = { saisie: ecranSaisieHTML, compte: ecranCompteHTML, categories: ecranCategoriesHTML, categorie: ecranCategorieHTML, guide: ecranGuideHTML };
+  const ecrans = { saisie: ecranSaisieHTML, compte: ecranCompteHTML, categories: ecranCategoriesHTML, categorie: ecranCategorieHTML, guide: ecranGuideHTML, partage: ecranPartageHTML }; // v1.01 — + l'écran « Partager l'appli »
   calque.innerHTML = ecrans[haut.type](haut);
   calque.scrollTop = 0;
 }
@@ -1217,6 +1220,57 @@ async function supprimerCategorie() {
   toast("Catégorie supprimée.");
 }
 
+/* ---------- 🤝 v1.01 — Partager l'appli ----------
+   Tout le monde reçoit la même appli : chacun signe le message de SON prénom (rangé sur l'appareil,
+   jamais dans les sauvegardes). Le texte du message, lui, est fixé par l'éditeur dans calcul.js. */
+
+function ecranPartageHTML() { // v1.01 — envoyer l'appli à un proche
+  const prenom = etat.meta?.prenom ?? "";
+  const peutPartager = typeof navigator.share === "function"; // Chrome Android 61+, Chrome/Edge Windows, Safari iPhone 12.2+ (vérifié sur MDN)
+  return `<div class="ecran" role="dialog" aria-modal="true" aria-labelledby="titre-partage">
+    <div class="ecran-entete"><button type="button" class="btn-icone" data-action="fermer" aria-label="Fermer">✕</button><h1 id="titre-partage">Partager l'appli</h1><span></span></div>
+    <div class="ecran-corps">
+      <p class="champ">Envoyez l'appli à un proche : il la reçoit vide, et ses chiffres restent chez lui. Le message contient seulement le lien, aucun de vos chiffres.</p>
+      <label class="champ"><span>Votre prénom</span><input type="text" data-champ="partage-prenom" value="${esc(prenom)}" maxlength="${C.MAX_PRENOM}" placeholder="ex. Rocco" autocomplete="given-name" enterkeyhint="done" /><span class="champ-aide">Il signe le message (« Salut, c'est … ! ») et reste sur cet appareil.</span></label>
+      <div class="actions champ">
+        ${peutPartager ? `<button type="button" class="btn btn-principal" data-action="partager-appli">📤 Partager le message</button>` : ""}
+        <button type="button" class="btn${peutPartager ? "" : " btn-principal"}" data-action="copier-message">📋 Copier le message</button>
+      </div>
+      <div class="champ qr-partage"><!-- v1.01 — le QR code AVANT l'aperçu du message : on le trouve sans défiler -->
+        <span>De la main à la main</span>
+        <img src="icones/qr-ma-compta.svg" alt="QR code de l'adresse ${esc(ADRESSE_APPLI)}" width="220" height="220" />
+        <span class="champ-aide">Votre proche vise ce code avec l'appareil photo de son téléphone : le lien ${esc(ADRESSE_APPLI)} s'ouvre.</span>
+      </div>
+      <div class="champ"><span>Aperçu du message</span><p class="message-partage" id="message-partage">${esc(C.messagePartage(prenom, ADRESSE_APPLI))}</p></div><!-- v1.01 — l'aperçu, en dernier -->
+    </div>
+  </div>`;
+}
+
+function messageActuel() { // v1.01 — signé du prénom tel qu'il est tapé, même s'il n'est pas encore enregistré
+  const champ = $('[data-champ="partage-prenom"]');
+  return C.messagePartage(champ ? champ.value : (etat.meta?.prenom ?? ""), ADRESSE_APPLI);
+}
+
+async function partagerAppli() { // v1.01 — ouvre WhatsApp, SMS, mail… avec le message déjà écrit
+  try {
+    await navigator.share({ text: messageActuel() }); // le texte seul, lien compris : avec « url » en plus, certaines applis l'afficheraient deux fois
+  } catch (e) {
+    if (e?.name === "AbortError") return; // partage annulé par vous : rien à signaler
+    toast("Le partage n'est pas possible ici : utilisez « Copier le message ».", { erreur: true, duree: 6000 });
+  }
+}
+
+async function copierMessage() { // v1.01 — à coller ensuite où vous voulez
+  try {
+    await navigator.clipboard.writeText(messageActuel());
+    toast("Message copié ✓ Collez-le dans WhatsApp, un SMS ou un mail.", { duree: 5000 });
+  } catch {
+    const zone = $("#message-partage"); // secours : le texte est sélectionné, il reste à faire « Copier »
+    if (zone) getSelection().selectAllChildren(zone);
+    toast("Copie automatique impossible : le message est sélectionné, faites « Copier ».", { erreur: true, duree: 6000 });
+  }
+}
+
 /* ---------- 👋 Guide du 1er lancement ---------- */
 
 function nouveauGuide() {
@@ -1721,6 +1775,10 @@ const ACTIONS = {
     rendre();
   },
   "mettre-a-jour": () => mettreAJour(),
+  "plus-tard": () => reporterMiseAJour(), // v1.01
+  "ouvrir-partage": () => ouvrir({ type: "partage" }), // v1.01
+  "partager-appli": () => partagerAppli(), // v1.01
+  "copier-message": () => copierMessage(), // v1.01
   "effacer-exemples": () => effacerExemples(),
   "sauvegarde-rapide": () => sauvegardeRapide(),
   "sauvegarder-fichier": () => sauvegarderFichier(),
@@ -1786,6 +1844,10 @@ const SUR_INPUT = {
     etat.filtres.texte = el.value;
     rendreListeOps();
   },
+  "partage-prenom": (el) => {
+    const zone = $("#message-partage"); // v1.01 — l'aperçu du message suit la frappe
+    if (zone) zone.textContent = C.messagePartage(el.value, ADRESSE_APPLI); // v1.01
+  },
 };
 
 const SUR_CHANGE = {
@@ -1815,6 +1877,11 @@ const SUR_CHANGE = {
   "reglage-appareil": async (el) => {
     await changerMeta({ appareil: el.value.trim() });
     toast("Nom de l'appareil enregistré ✓");
+  },
+  "partage-prenom": async (el) => {
+    const prenom = C.normaliserPrenom(el.value); // v1.01 — rangé avec le nom de l'appareil (meta) : jamais dans les sauvegardes
+    el.value = prenom; // v1.01
+    await changerMeta({ prenom }); // v1.01
   },
 };
 
@@ -1976,8 +2043,15 @@ async function enregistrerServiceWorker() {
 }
 
 function proposerMiseAJour(worker) {
+  if (worker !== etat.majEnAttente) etat.majReportee = false; // v1.01 — une version encore plus récente : on la propose à nouveau
   etat.majEnAttente = worker;
   rendreBandeaux();
+}
+
+function reporterMiseAJour() { // v1.01 — « Plus tard » : la nouvelle version attend ; elle s'installera à la prochaine ouverture
+  etat.majReportee = true;
+  rendreBandeaux();
+  toast("D'accord : la mise à jour se fera la prochaine fois que vous fermerez puis rouvrirez l'appli.", { duree: 6000 });
 }
 
 function mettreAJour() {

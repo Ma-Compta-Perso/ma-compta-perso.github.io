@@ -832,6 +832,36 @@ body.calque-ouvert {
   gap: 0.5rem;
 }
 
+/* v1.01 — Partager l'appli : l'aperçu du message et le QR code */
+.message-partage {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--rayon);
+  border: 1px solid var(--trait);
+  background: var(--surface);
+  white-space: pre-wrap; /* v1.01 — les retours à la ligne du message se voient tels qu'ils partiront */
+  overflow-wrap: anywhere;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.qr-partage {
+  justify-items: center;
+  text-align: center;
+}
+
+.qr-partage > span:first-child {
+  justify-self: stretch; /* v1.01 — le titre reste aligné à gauche, comme les autres champs */
+  text-align: left;
+}
+
+.qr-partage img {
+  width: min(220px, 70vw);
+  height: auto;
+  border-radius: 8px;
+  background: #fff; /* v1.01 — fond blanc même en thème sombre : sinon le code ne se scanne pas */
+}
+
 .a-propos p + p {
   margin-top: 0.4rem;
 }
@@ -943,9 +973,13 @@ textarea {
 .ecran-entete h1 {
   text-align: center;
   font-size: 1.0625rem;
+  line-height: 1.25; /* v1.01 — en grand texte, le titre passe sur 2 lignes au lieu d'être coupé (« Partager l'a… ») */
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box; /* v1.01 */
+  -webkit-box-orient: vertical; /* v1.01 */
+  -webkit-line-clamp: 2; /* v1.01 */
+  line-clamp: 2; /* v1.01 */
+  overflow-wrap: break-word; /* v1.01 */
 }
 
 .ecran-corps {

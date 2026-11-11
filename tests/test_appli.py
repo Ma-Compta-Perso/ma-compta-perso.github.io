@@ -379,36 +379,67 @@ def test_hors_ligne(nav, srv):
     page.wait_for_selector(".solde-chiffre")
     saisir(page, "4,5", "def-courses")
     assert [o["montant"] for o in s.base()["operations"]] == [-450]
+    onglet(page, "reglages")  # v1.01 — le QR code de « Partager l'appli » s'affiche aussi hors ligne
+    page.click('[data-action="ouvrir-partage"]')
+    attendre(page, "() => document.querySelector('.qr-partage img')?.complete === true")
+    assert page.evaluate("document.querySelector('.qr-partage img').naturalWidth") > 0, "QR code absent hors ligne"
     s.ctx.set_offline(False)
     s.fermer()
 
 
 def test_mise_a_jour(nav, _srv):
+    """N → N+1 avec « Plus tard » (v1.01 : installée à la réouverture), puis N+1 → N+2 avec « Mettre à jour ».
+    Les données restent intactes à chaque fois."""
     dossier = Path(tempfile.mkdtemp(prefix="maj-"))
     copie = dossier / "appli"
     shutil.copytree(RACINE, copie, ignore=shutil.ignore_patterns("tests", "__pycache__"))
     srv = Serveur(copie)
+
+    def publier(ancienne, nouvelle):  # comme toi sur GitHub : une nouvelle version déposée
+        for nom, motif, remplace in [("app.js", f'const VERSION = "{ancienne}"', f'const VERSION = "{nouvelle}"'), ("sw.js", f'"ma-compta-v{ancienne}"', f'"ma-compta-v{nouvelle}"')]:
+            f = copie / nom
+            contenu = f.read_text(encoding="utf-8")
+            assert motif in contenu, f"{motif} introuvable dans {nom}"
+            f.write_text(contenu.replace(motif, remplace), encoding="utf-8")
+
+    def version_affichee(page):
+        onglet(page, "reglages")
+        return re.search(r"version (\S+)", texte(page, ".a-propos")).group(1)
+
     try:
         s = Session(nav, srv)
         page = s.ouvrir()
         guide(page)
         saisir(page, "7", "def-courses")
         attendre(page, "() => navigator.serviceWorker.controller !== null")
-        version = re.search(r'const VERSION = "([\d.]+)"', (copie / "app.js").read_text()).group(1)
-        suivante = f"{version}-test"
-        for nom, motif, remplace in [("app.js", f'const VERSION = "{version}"', f'const VERSION = "{suivante}"'), ("sw.js", f'"ma-compta-v{version}"', f'"ma-compta-v{suivante}"')]:
-            f = copie / nom
-            contenu = f.read_text()
-            assert motif in contenu, f"{motif} introuvable dans {nom}"
-            f.write_text(contenu.replace(motif, remplace))
+        v0 = re.search(r'const VERSION = "([\d.]+)"', (copie / "app.js").read_text(encoding="utf-8")).group(1)
+        v1, v2 = f"{v0}-test", f"{v0}-test2"
+
+        # 1) v1.01 — « Plus tard » : le bandeau se ferme, rien ne change tout de suite…
+        publier(v0, v1)
+        page.evaluate("navigator.serviceWorker.getRegistration().then(r => r.update())")
+        page.wait_for_selector('[data-action="plus-tard"]', timeout=15000)
+        page.click('[data-action="plus-tard"]')
+        expect(page.locator('[data-action="mettre-a-jour"]')).to_have_count(0)
+        expect(page.locator("#toast")).to_contain_text("fermerez puis rouvrirez")
+        assert version_affichee(page) == v0, "« Plus tard » ne doit rien installer tout de suite"
+        # … et la nouvelle version s'installe d'elle-même quand on ferme complètement l'appli puis qu'on la rouvre.
+        page.close()
+        time.sleep(1.5)
+        page = s.page = s.nouvelle_page()
+        page.wait_for_selector(".solde-chiffre")
+        assert version_affichee(page) == v1, "la version reportée doit s'installer à la réouverture"
+        assert [o["montant"] for o in s.base()["operations"]] == [-700], "données perdues à la mise à jour"
+
+        # 2) « Mettre à jour » : installation immédiate, données intactes.
+        publier(v1, v2)
         page.evaluate("navigator.serviceWorker.getRegistration().then(r => r.update())")
         page.wait_for_selector('[data-action="mettre-a-jour"]', timeout=15000)
         assert page.locator(".saisie").count() == 0
         with page.expect_event("load", timeout=15000):
             page.click('[data-action="mettre-a-jour"]')
         page.wait_for_selector(".solde-chiffre")
-        onglet(page, "reglages")
-        assert f"version {suivante}" in texte(page, ".a-propos"), texte(page, ".a-propos")
+        assert version_affichee(page) == v2
         assert [o["montant"] for o in s.base()["operations"]] == [-700], "données perdues à la mise à jour"
         s.fermer()
     finally:
@@ -767,6 +798,61 @@ def test_virement_incomplet(nav, srv, travail):
     s2.fermer()
 
 
+def test_partage(nav, srv):
+    """v1.01 — Partager l'appli : message signé du prénom, boutons Partager et Copier, QR code ;
+    le prénom reste sur l'appareil et ne part ni dans la sauvegarde ni dans la sauvegarde anonymisée."""
+    s = Session(nav, srv)
+    s.ctx.grant_permissions(["clipboard-read", "clipboard-write"], origin=srv.url.rstrip("/"))
+    # On remplace la feuille de partage du téléphone par un « espion » qui note ce qui aurait été envoyé.
+    s.page.add_init_script("navigator.share = (d) => { window.__partage = d; return Promise.resolve(); }; navigator.canShare = () => false;")
+    page = s.ouvrir()
+    guide(page)
+    onglet(page, "reglages")
+    page.click('[data-action="ouvrir-partage"]')
+    page.wait_for_selector("#message-partage")
+    expect(page.locator("#message-partage")).to_contain_text("Salut ! Je te partage")  # pas encore de prénom
+    page.fill('[data-champ="partage-prenom"]', "  Rocco ")
+    expect(page.locator("#message-partage")).to_contain_text("Salut, c'est Rocco ! Je te partage")
+    page.click('[data-action="partager-appli"]')
+    partage = page.evaluate("window.__partage")
+    assert set(partage) == {"text"}, f"seul le texte doit partir (sinon le lien apparaît deux fois) : {partage}"
+    assert partage["text"].startswith("Salut, c'est Rocco ! "), partage["text"][:40]
+    assert "👉 https://ma-compta-perso.github.io/\n" in partage["text"]
+    page.click('[data-action="copier-message"]')
+    expect(page.locator("#toast")).to_contain_text("Message copié")
+    assert page.evaluate("navigator.clipboard.readText()") == partage["text"], "le message copié diffère du message partagé"
+    qr = page.evaluate("(() => { const i = document.querySelector('.qr-partage img'); return [i.complete, i.naturalWidth]; })()")
+    assert qr[0] and qr[1] > 0, f"QR code non affiché : {qr}"
+    page.keyboard.press("Escape")
+    page.wait_for_selector("#message-partage", state="detached")
+    # Le prénom (nettoyé) est gardé sur l'appareil…
+    page.reload()
+    page.wait_for_selector(".solde-chiffre")
+    onglet(page, "reglages")
+    page.click('[data-action="ouvrir-partage"]')
+    assert page.input_value('[data-champ="partage-prenom"]') == "Rocco"
+    page.keyboard.press("Escape")
+    page.wait_for_selector("#message-partage", state="detached")
+    # … mais ne part ni dans la sauvegarde, ni dans la sauvegarde anonymisée.
+    for action in ["sauvegarder-fichier", "exporter-anonyme"]:
+        with page.expect_download() as d:
+            page.click(f'[data-action="{action}"]')
+        assert "Rocco" not in d.value.path().read_text(encoding="utf-8"), f"le prénom est parti dans « {action} »"
+    s.fermer()
+
+    # Navigateur sans partage (ex. Chrome sur Linux) : seul « Copier » est proposé, en bouton principal.
+    s2 = Session(nav, srv, taille="pc-demi-ecran")
+    s2.page.add_init_script("delete Navigator.prototype.share;")
+    page = s2.ouvrir()
+    guide(page)
+    onglet(page, "reglages")
+    page.click('[data-action="ouvrir-partage"]')
+    page.wait_for_selector("#message-partage")
+    assert page.locator('[data-action="partager-appli"]').count() == 0
+    assert "btn-principal" in page.get_attribute('[data-action="copier-message"]', "class")
+    s2.fermer()
+
+
 def test_installable(nav, srv):
     """On demande à Chrome lui-même (son protocole de débogage) si l'appli est installable."""
     s = Session(nav, srv)
@@ -790,10 +876,13 @@ def test_version(zip_nom):
     if zip_nom:
         attendu = "ma-compta_v" + v_app.replace(".", "_") + ".zip"
         assert Path(zip_nom).name == attendu, f"le zip devrait s'appeler {attendu}"
-    fichiers_sw = re.findall(r'"([^"]+)",?\n', sw.split("const FICHIERS = [")[1].split("];")[0])
+    fichiers_sw = re.findall(r'^\s*"([^"]+)",?', sw.split("const FICHIERS = [")[1].split("];")[0], re.M)  # v1.01 — lu même avec un commentaire en bout de ligne
     for f in fichiers_sw:
         if f != "./":
             assert (RACINE / f).exists(), f"sw.js garde en cache un fichier absent : {f}"
+    attendus = ["index.html", "style.css", "app.js", "calcul.js", "stockage.js", "manifest.webmanifest"] + [f"icones/{f.name}" for f in (RACINE / "icones").iterdir()]
+    for f in attendus:  # v1.01 — l'inverse aussi : chaque fichier de l'appli est gardé pour le hors ligne
+        assert f in fichiers_sw, f"{f} n'est pas gardé pour le hors ligne (liste FICHIERS de sw.js)"
     for f in RACINE.glob("*.js"):
         contenu = f.read_text(encoding="utf-8")
         assert "console.log" not in contenu and "debugger" not in contenu, f"reste de débogage dans {f.name}"
@@ -819,6 +908,14 @@ def test_affichage(nav, srv, captures):
                     if captures:
                         page.screenshot(path=str(captures / f"{nom}_{vue}.png"))
                     sans_debordement(page, f"{nom} {vue}")
+                onglet(page, "reglages")  # v1.01 — l'écran « Partager l'appli »
+                page.click('[data-action="ouvrir-partage"]')
+                page.wait_for_selector("#message-partage")
+                if captures:
+                    page.screenshot(path=str(captures / f"{nom}_partage.png"))
+                sans_debordement(page, f"{nom} partage")
+                page.keyboard.press("Escape")
+                page.wait_for_selector("#message-partage", state="detached")
                 page.click(".onglet-plus")
                 page.wait_for_selector(".pave")
                 taper(page, "42,9")
@@ -852,6 +949,7 @@ def main():
         tests = [
             ("version", lambda: test_version(args.zip)),
             ("installable", lambda: test_installable(nav, srv)),
+            ("partage", lambda: test_partage(nav, srv)),
             ("parcours complet", lambda: test_parcours_complet(nav, srv)),
             ("virement", lambda: test_virement(nav, srv)),
             ("mode bouton", lambda: test_mode_bouton(nav, srv)),

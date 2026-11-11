@@ -503,6 +503,31 @@ test("virements incomplets : repérés, et signalés à la restauration", () => 
   assert.match(C.verifierSauvegarde(fausse).erreur, /lien de virement/);
 });
 
+/* ------------------------- v1.01 — Partager l'appli ------------------------- */
+
+test("v1.01 — prénom : espaces nettoyés, 30 caractères au plus", () => {
+  assert.equal(C.normaliserPrenom("  Rocco  "), "Rocco");
+  assert.equal(C.normaliserPrenom("Jean   Marc"), "Jean Marc");
+  assert.equal(C.normaliserPrenom(""), "");
+  assert.equal(C.normaliserPrenom(null), "");
+  assert.equal(C.normaliserPrenom(undefined), "");
+  assert.equal(C.normaliserPrenom("x".repeat(50)).length, C.MAX_PRENOM);
+});
+
+test("v1.01 — message de partage : signé du prénom, sinon « Salut ! »", () => {
+  const adresse = "https://ma-compta-perso.github.io/";
+  const m = C.messagePartage("Rocco", adresse);
+  assert.ok(m.startsWith("Salut, c'est Rocco ! Je te partage une petite appli"), m.slice(0, 60));
+  assert.ok(m.includes(`👉 ${adresse}\n`), "l'adresse doit être sur sa propre ligne");
+  assert.ok(m.includes("• Android : ouvre le lien dans Chrome"));
+  assert.ok(m.includes("• iPhone : ouvre le lien dans Safari"));
+  assert.ok(m.endsWith("c'est elle qui garde tes comptes."));
+  assert.ok(C.messagePartage("", adresse).startsWith("Salut ! Je te partage"));
+  assert.ok(C.messagePartage("   ", adresse).startsWith("Salut ! Je te partage"));
+  assert.ok(C.messagePartage(" Marie ", adresse).startsWith("Salut, c'est Marie ! "));
+  assert.equal(C.messagePartage("Rocco", adresse).split(adresse).length, 2, "l'adresse une seule fois");
+});
+
 /* ------------------------- Exemples ------------------------- */
 
 test("données d'exemple : déterministes, montants entiers, dates valides, virements équilibrés", () => {

@@ -741,6 +741,40 @@ export function fusionner(a, b) {
 }
 
 /* =====================================================================
+   v1.01 — PARTAGER L'APPLI : le message que chacun envoie à un proche.
+   Le texte est fixé par l'éditeur (Rocco) ; seul le prénom change d'un appareil à l'autre,
+   pour que personne ne partage « au nom de Rocco » sans être Rocco.
+   ===================================================================== */
+
+export const MAX_PRENOM = 30; // v1.01 — un prénom, pas un roman : le message reste lisible
+
+/** v1.01 — Le prénom tel qu'il signera le message : sans espaces en trop, 30 caractères au plus. */
+export function normaliserPrenom(texte) {
+  return String(texte ?? "")
+    .replace(/[\s  ]+/g, " ")
+    .trim()
+    .slice(0, MAX_PRENOM)
+    .trim();
+}
+
+/** v1.01 — Le message de partage. Avec un prénom : « Salut, c'est Rocco ! » ; sans : « Salut ! ». */
+export function messagePartage(prenom, adresse) {
+  const p = normaliserPrenom(prenom);
+  return [
+    `Salut${p ? `, c'est ${p}` : ""} ! Je te partage une petite appli pour suivre tes comptes : gratuite, sans pub, sans inscription.`,
+    `👉 ${adresse}`,
+    "",
+    "Pour l'installer :",
+    "• Android : ouvre le lien dans Chrome, menu ⋮ → « Installer l'application ».",
+    "• iPhone : ouvre le lien dans Safari, bouton Partager → « Sur l'écran d'accueil ».",
+    "",
+    "Ensuite, ouvre-la depuis son icône et laisse-toi guider. Tu peux d'abord l'essayer avec des exemples.",
+    "",
+    "Important : tes chiffres restent uniquement sur ton téléphone, personne d'autre ne les voit, même pas moi. Du coup, fais une sauvegarde de temps en temps (Réglages → Partager la sauvegarde, vers ton Drive ou ton mail) : si tu perds ton téléphone, c'est elle qui garde tes comptes.",
+  ].join("\n");
+}
+
+/* =====================================================================
    DONNÉES D'EXEMPLE (« ▶ Essayer avec des exemples ») — le même générateur sert aux tests.
    Tirage pseudo-aléatoire « à graine » : mêmes paramètres → mêmes données, toujours.
    ===================================================================== */

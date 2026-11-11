@@ -27,6 +27,13 @@ restauration identique, refus des sauvegardes invalides, CSV, sauvegarde anonymi
 raccourcis de l'icône, et chaque écran à 5 tailles (téléphones, PC à 125 %), en clair et en sombre,
 à 100 % et 150 % de texte : aucun débordement, aucune erreur dans la console, aucun appel réseau extérieur.
 
+v1.01 — Ajoutés : « Partager l'appli » (message signé du prénom, boutons Partager et Copier, prénom
+gardé sur l'appareil mais absent des sauvegardes, QR code affiché même hors ligne), le bouton « Plus tard »
+du bandeau de mise à jour (la nouvelle version s'installe quand on ferme puis rouvre l'appli), et la
+vérification que chaque fichier de l'appli est bien gardé pour le hors ligne. Le QR code
+(`icones/qr-ma-compta.svg`) a été vérifié à sa fabrication avec un vrai lecteur de QR code : il redonne
+exactement https://ma-compta-perso.github.io/ .
+
 S'y ajoutent les tests issus de la relecture indépendante du code (chacun a été vérifié : il ÉCHOUE si on
 remet le bug) : « ↶ Annuler » jamais sous le doigt par erreur, double toucher (jamais 2 comptes, jamais 2
 retours arrière), sauvegarde d'exemple restaurée par erreur puis effacée (la copie de sécurité survit),

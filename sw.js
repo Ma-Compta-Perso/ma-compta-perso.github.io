@@ -3,7 +3,7 @@
 // ⚠️ Le n° de CACHE change à CHAQUE livraison (même si rien d'autre ne bouge ici) :
 // c'est ce changement qui prévient le téléphone qu'une nouvelle version existe.
 
-const CACHE = "ma-compta-v1.00";
+const CACHE = "ma-compta-v1.01"; // v1.01 — nouveau n° : c'est lui qui signale la nouvelle version aux téléphones
 const FICHIERS = [
   "./",
   "index.html",
@@ -18,6 +18,7 @@ const FICHIERS = [
   "icones/icone-180.png",
   "icones/raccourci-depense-96.png",
   "icones/raccourci-entree-96.png",
+  "icones/qr-ma-compta.svg", // v1.01 — le QR code de l'écran « Partager l'appli », visible même hors ligne
 ];
 
 self.addEventListener("install", (e) => {
