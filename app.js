@@ -5,8 +5,14 @@
 import * as C from "./calcul.js";
 import * as S from "./stockage.js";
 
-const VERSION = "1.01"; // v1.01 — ⚠️ le même n° est dans sw.js (CACHE) et dans le nom du zip : un test le vérifie.
+const VERSION = "1.02"; // v1.02 — ⚠️ le même n° est dans sw.js (CACHE) et dans le nom du zip : un test le vérifie.
 const ADRESSE_APPLI = "https://ma-compta-perso.github.io/"; // v1.01 — l'adresse publique, la même que dans le QR code icones/qr-ma-compta.svg
+// v1.02 — L'éditeur (Rocco) : où arrivent les avis, et son compte PayPal pour les dons. Choix du 11/11/2026 : son
+// adresse perso « pour l'instant ». Pour la changer (adresse dédiée, page Tipeee…) : ici, et nulle part ailleurs.
+// Découpée exprès : les robots qui fouillent GitHub à la recherche d'adresses mail ne la reconnaissent pas.
+const EDITEUR_MAIL = ["ljjm2", "orange.fr"].join("@"); // v1.02
+const EDITEUR_PAYPAL = EDITEUR_MAIL; // v1.02 — le compte PayPal de Rocco est ouvert à cette même adresse
+const LIEN_PAYPAL = "https://www.paypal.com/"; // v1.02 — l'accueil de PayPal, pour qui n'a pas l'appli PayPal sous la main
 const COULEUR_BARRE = { clair: "#f2f4f3", sombre: "#121619" }; // couleur de la barre du téléphone (comme le fond)
 const ICONES_COMPTE = ["🏦", "💳", "🐷", "👛", "💶", "🏠", "💼", "⭐"];
 const ICONES_CATEGORIE = ["🛒", "🍽️", "☕", "🚗", "⛽", "🚌", "🏠", "⚡", "📶", "🩺", "💊", "👕", "🎬", "🏇", "🏆", "🎮", "📺", "✈️", "📚", "👶", "🐾", "🎁", "🧾", "🔧", "💇", "🍷", "🚬", "💼", "💰", "❓"];
@@ -46,6 +52,7 @@ const etat = {
   majDemandee: false,
   majReportee: false, // v1.01 — « Plus tard » : le bandeau se cache jusqu'à la prochaine ouverture de l'appli
   copieRestauration: false, // une copie de sécurité d'avant restauration existe
+  copieMiseAJour: null, // v1.02 — { cree_le, vers } : la copie faite au 1er lancement d'une nouvelle version (🛟)
   persistant: null,
   erreurs: [],
   ignorerClicsJusqua: 0, // juste après un enregistrement, un 2e toucher trop rapide est ignoré
@@ -134,13 +141,35 @@ function dateHeure(iso) {
 
 async function chargerDonnees() {
   let d = await S.chargerTout();
+  const metaAvant = d.meta; // v1.02 — lue AVANT une éventuelle migration (qui, elle, note déjà la nouvelle version)
   if (d.meta) d = await S.migrerSiBesoin(d, VERSION);
+  if (C.copieAvantMiseAJourNecessaire(metaAvant, VERSION)) d = await copierAvantMiseAJour(d, metaAvant); // v1.02 — 🛟 1er lancement d'une nouvelle version
   etat.meta = d.meta;
   etat.reglages = C.normaliserReglages(d.reglages); // un réglage abîmé ne peut pas empêcher l'appli de s'afficher
   for (const t of C.TABLES) etat[t] = d[t] || [];
   indexer();
   if (!etat.saisie) calculerOrdreCategories(); // pendant une saisie, la grille ne bouge pas sous le doigt
   etat.copieRestauration = Boolean(await S.lireCopieSecurite("avant-restauration"));
+  const copieMaj = await S.lireCopieSecurite("avant-mise-a-jour"); // v1.02 — pour proposer « 🛟 Revenir à l'état d'avant la mise à jour »
+  etat.copieMiseAJour = copieMaj ? { cree_le: copieMaj.cree_le, vers: copieMaj.contenu?.vers ?? "" } : null; // v1.02
+}
+
+/** v1.02 — 🛟 Au 1er lancement d'une nouvelle version, AVANT qu'elle n'écrive quoi que ce soit : l'état laissé par
+ *  l'ancienne version est mis de côté (une seule copie, remplacée à la mise à jour suivante). Même un bug que les
+ *  tests n'auraient pas vu ne pourrait donc pas faire perdre de données. Si l'écriture échoue (téléphone plein…),
+ *  l'appli démarre quand même, et la copie est retentée au prochain lancement. */
+async function copierAvantMiseAJour(d, metaAvant) {
+  const meta = { ...d.meta, version_appli: VERSION }; // désormais : la dernière version qui a ouvert ces données
+  const sauvegarde = C.construireSauvegarde(d, { versionAppli: VERSION, appareil: d.meta.appareil || "", maintenant: maintenant(), exemple: false });
+  const contenu = { sauvegarde, meta: d.meta, de: metaAvant.version_appli ?? null, vers: VERSION };
+  try {
+    await S.ecrireCopieEtMeta({ cle: "avant-mise-a-jour", contenu }, meta);
+  } catch (e) {
+    etat.erreurs.unshift({ quand: new Date().toLocaleString("fr-FR"), message: `Copie de sécurité d'avant la mise à jour impossible (${String(e?.message ?? e).slice(0, 200)}). Faites une sauvegarde.` });
+    return d;
+  }
+  prevenirAutresFenetres(); // une autre fenêtre ouverte relit la base : elle ne réécrira pas l'ancienne « meta » par-dessus
+  return { ...d, meta };
 }
 
 /* Les écritures passent l'une après l'autre (file d'attente). Pourquoi : deux écritures rapprochées
@@ -575,7 +604,7 @@ function vueReglages() {
   <div>
   <section class="section"><h2>Comptes</h2><div class="bloc">${comptes}${boutonReglage("ajouter-compte", "➕", "Ajouter un compte", "livret, espèces, autre banque…")}</div></section>
   <section class="section"><h2>Catégories</h2><div class="bloc">${boutonReglage("gerer-categories", "🏷️", "Gérer les catégories", "renommer, ajouter, archiver")}</div></section>
-  <section class="section"><h2>Partager l'appli</h2><div class="bloc">${boutonReglage("ouvrir-partage", "🤝", "Envoyer l'appli à un proche", "un message tout prêt, ou un QR code à scanner")}</div></section><!-- v1.01 — 🤝 et pas 📤 : à ne pas confondre avec « Partager la sauvegarde », qui contient vos chiffres -->
+  <section class="section"><h2>Partager et soutenir l'appli</h2><div class="bloc">${boutonReglage("ouvrir-partage", "🤝", "Envoyer l'appli à un proche", "un message tout prêt, ou un QR code à scanner")}${boutonReglage("ouvrir-avis", "💬", "Donner mon avis ou une idée", "pour améliorer les prochaines versions")}${boutonReglage("ouvrir-soutien", "☕", "Soutenir l'appli", "un petit don, si elle vous rend service")}</div></section><!-- v1.01 — 🤝 et pas 📤 : à ne pas confondre avec « Partager la sauvegarde », qui contient vos chiffres ; v1.02 — + 💬 avis et ☕ soutien -->
   <section class="section"><h2>Sauvegarde</h2>
     <div class="bloc">
       <div class="reglage"><p>${esc(derniere)}</p><p class="petit doux">Si l'appareil est perdu ou cassé, seules vos sauvegardes gardent vos chiffres. Rangez-les en lieu sûr (Drive, mail…), jamais en lien public.</p></div>
@@ -583,6 +612,7 @@ function vueReglages() {
       ${boutonReglage("partager-sauvegarde", "📤", "Partager la sauvegarde", "vers Drive, un mail…")}
       ${boutonReglage("restaurer", "📂", "Restaurer une sauvegarde", "remplace les données de cet appareil")}
       ${etat.copieRestauration ? boutonReglage("annuler-restauration", "🛟", "Revenir à l'état d'avant la dernière restauration", "si vous vous êtes trompé de fichier") : ""}
+      ${etat.copieMiseAJour ? boutonReglage("revenir-avant-maj", "🛟", "Revenir à l'état d'avant la mise à jour", `copie automatique du ${dateHeure(etat.copieMiseAJour.cree_le)}, juste avant la version ${etat.copieMiseAJour.vers}`) : ""}<!-- v1.02 — si une mise à jour avait abîmé quelque chose -->
       ${boutonReglage("exporter-anonyme", "🕶️", "Sauvegarde anonymisée", "pour demander de l'aide (à Claude par exemple) sans montrer vos libellés")}
       ${boutonReglage("exporter-csv", "📊", "Exporter pour Excel (CSV)", "toutes les opérations")}
       <label class="champ reglage"><span>Me rappeler de sauvegarder</span><select data-champ="reglage-rappel">${JOURS_RAPPEL.map(([n, t]) => `<option value="${n}"${n === r.rappel_sauvegarde_jours ? " selected" : ""}>${t}</option>`).join("")}</select></label>
@@ -657,7 +687,7 @@ function rendreCalque() {
   }
   calque.hidden = false;
   calque.inert = false;
-  const ecrans = { saisie: ecranSaisieHTML, compte: ecranCompteHTML, categories: ecranCategoriesHTML, categorie: ecranCategorieHTML, guide: ecranGuideHTML, partage: ecranPartageHTML }; // v1.01 — + l'écran « Partager l'appli »
+  const ecrans = { saisie: ecranSaisieHTML, compte: ecranCompteHTML, categories: ecranCategoriesHTML, categorie: ecranCategorieHTML, guide: ecranGuideHTML, partage: ecranPartageHTML, avis: ecranAvisHTML, soutien: ecranSoutienHTML }; // v1.01 — + l'écran « Partager l'appli » ; v1.02 — + « Donner mon avis » et « Soutenir l'appli »
   calque.innerHTML = ecrans[haut.type](haut);
   calque.scrollTop = 0;
 }
@@ -1271,6 +1301,157 @@ async function copierMessage() { // v1.01 — à coller ensuite où vous voulez
   }
 }
 
+/* ---------- 💬 v1.02 — Donner mon avis ----------
+   L'appli n'a pas de serveur et n'envoie rien : elle PRÉPARE le message, la personne l'envoie elle-même
+   (sa messagerie, WhatsApp…). Ce qui est tapé est gardé dans l'écran ouvert (etat.pile) : si l'écran est redessiné
+   (une autre fenêtre a écrit dans la base), le texte n'est pas perdu. */
+
+const EXEMPLES_AVIS = { // v1.02 — le texte d'exemple du champ, selon le genre de message
+  idee: "ex. Pouvoir répartir une dépense sur deux catégories…",
+  probleme: "Qu'avez-vous fait ? Que s'est-il passé ? Sur quel écran ?",
+  avis: "Ce qui vous plaît, ce qui vous gêne…",
+};
+
+function ecranAvisHTML(haut) { // v1.02
+  const peutPartager = typeof navigator.share === "function"; // Chrome Android 61+, Chrome/Edge Windows, Safari iPhone 12.2+ (vérifié sur MDN pour la v1.01)
+  const a = avisActuel(haut);
+  const genres = C.TYPES_AVIS.map((t) => `<button type="button" data-action="genre-avis" data-genre="${t.id}" aria-pressed="${haut.genre === t.id}">${t.icone} ${esc(t.nom)}</button>`).join("");
+  const etoiles = [1, 2, 3, 4, 5].map((n) => `<button type="button" class="etoile" data-action="note-avis" data-note="${n}" aria-label="${n} sur 5" aria-pressed="${n <= haut.note}">${n <= haut.note ? "★" : "☆"}</button>`).join("");
+  return `<div class="ecran" role="dialog" aria-modal="true" aria-labelledby="titre-avis">
+    <div class="ecran-entete"><button type="button" class="btn-icone" data-action="fermer" aria-label="Fermer">✕</button><h1 id="titre-avis">Donner mon avis</h1><span></span></div>
+    <div class="ecran-corps">
+      <p class="champ">Une idée, un problème, un avis ? Ils servent à améliorer les prochaines versions. L'appli prépare le message, et c'est vous qui l'envoyez : rien ne part tout seul, et jamais vos chiffres.</p>
+      <div class="champ"><span>C'est…</span><div class="segments segments-avis" role="group" aria-label="Genre de message">${genres}</div></div>
+      <div class="champ" id="avis-note"${haut.genre === "avis" ? "" : " hidden"}><span>Votre note (facultatif)</span><div class="etoiles" role="group" aria-label="Note sur 5">${etoiles}</div></div>
+      <label class="champ"><span>Votre message</span><textarea data-champ="avis-texte" id="avis-texte" maxlength="${C.MAX_AVIS}" rows="5" placeholder="${esc(EXEMPLES_AVIS[haut.genre])}">${esc(haut.texte)}</textarea><span class="champ-aide">${C.MAX_AVIS} caractères au plus. Pour un problème, l'appli ajoute la version et le type d'appareil (voyez l'aperçu).</span></label>
+      <div class="actions champ">
+        <a class="btn btn-principal" id="avis-mail" data-action="envoyer-avis" href="${esc(C.lienMail(EDITEUR_MAIL, a.sujet, a.corps))}">✉️ Envoyer par mail</a>
+        ${peutPartager ? `<button type="button" class="btn" data-action="partager-avis">📤 Autre moyen</button>` : ""}
+        <button type="button" class="btn" data-action="copier-avis">📋 Copier</button>
+      </div>
+      <p class="champ champ-aide">Le message part vers l'éditeur de l'appli : <strong class="adresse">${esc(EDITEUR_MAIL)}</strong></p>
+      <div class="champ"><span>Aperçu du message</span><p class="message-partage" id="apercu-avis">${esc(a.corps)}</p></div>
+    </div>
+  </div>`;
+}
+
+function avisActuel(haut = etat.pile[etat.pile.length - 1]) { // v1.02 — le message tel qu'il partira, au caractère près
+  const infos = C.infosAppareil({ ua: navigator.userAgent, largeur: innerWidth, hauteur: innerHeight, installee: estInstallee(), taille: etat.reglages.taille_texte, theme: etat.reglages.theme });
+  return C.messageAvis({ type: haut?.genre, note: haut?.note ?? 0, texte: haut?.texte ?? "", version: VERSION, infos });
+}
+
+function avisVide() { // v1.02 — rien d'écrit (une note seule, dans « Un avis », suffit)
+  const haut = etat.pile[etat.pile.length - 1];
+  return !(haut?.texte ?? "").trim() && !(haut?.genre === "avis" && haut.note > 0);
+}
+
+function majAvis() { // v1.02 — l'aperçu et le lien « mailto » suivent la frappe
+  const a = avisActuel();
+  const apercu = $("#apercu-avis");
+  if (apercu) apercu.textContent = a.corps;
+  const lien = $("#avis-mail");
+  if (lien) lien.href = C.lienMail(EDITEUR_MAIL, a.sujet, a.corps);
+}
+
+function choisirGenreAvis(genre) { // v1.02 — sans redessiner l'écran : le texte tapé et le clavier restent en place
+  const haut = etat.pile[etat.pile.length - 1];
+  if (haut?.type !== "avis" || !C.TYPES_AVIS.some((t) => t.id === genre)) return;
+  haut.genre = genre;
+  for (const b of document.querySelectorAll('[data-action="genre-avis"]')) b.setAttribute("aria-pressed", String(b.dataset.genre === genre));
+  const note = $("#avis-note");
+  if (note) note.hidden = genre !== "avis";
+  const champ = $("#avis-texte");
+  if (champ) champ.placeholder = EXEMPLES_AVIS[genre];
+  majAvis();
+}
+
+function noterAvis(n) { // v1.02 — toucher la même étoile une 2e fois retire la note
+  const haut = etat.pile[etat.pile.length - 1];
+  if (haut?.type !== "avis") return;
+  haut.note = haut.note === n ? 0 : n;
+  for (const b of document.querySelectorAll('[data-action="note-avis"]')) {
+    const allumee = Number(b.dataset.note) <= haut.note;
+    b.textContent = allumee ? "★" : "☆";
+    b.setAttribute("aria-pressed", String(allumee));
+  }
+  majAvis();
+}
+
+function envoyerAvis(e) { // v1.02 — c'est le lien « mailto » qui ouvre la messagerie ; on ne l'arrête que si le message est vide
+  if (avisVide()) {
+    e?.preventDefault();
+    toast("Écrivez d'abord quelques mots.", { erreur: true });
+    $("#avis-texte")?.focus();
+    return;
+  }
+  majAvis(); // le lien porte exactement le dernier caractère tapé
+  toast("Votre messagerie s'ouvre avec le message : vérifiez-le, puis envoyez-le. Rien ne s'ouvre ? Utilisez « 📋 Copier ».", { duree: 8000 });
+}
+
+async function partagerAvis() { // v1.02 — WhatsApp, SMS… : la personne choisit à qui l'envoyer
+  if (avisVide()) {
+    toast("Écrivez d'abord quelques mots.", { erreur: true });
+    return;
+  }
+  try {
+    await navigator.share({ text: avisActuel().corps });
+  } catch (e) {
+    if (e?.name === "AbortError") return; // partage annulé : rien à signaler
+    toast("Le partage n'est pas possible ici : utilisez « Copier ».", { erreur: true, duree: 6000 });
+  }
+}
+
+async function copierAvis() { // v1.02 — à coller dans un mail (webmail sur PC) ou dans WhatsApp
+  if (avisVide()) {
+    toast("Écrivez d'abord quelques mots.", { erreur: true });
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(avisActuel().corps);
+    toast(`Message copié ✓ Collez-le dans un mail à ${EDITEUR_MAIL}.`, { duree: 6000 });
+  } catch {
+    const zone = $("#apercu-avis"); // secours : le texte est sélectionné, il reste à faire « Copier »
+    if (zone) getSelection().selectAllChildren(zone);
+    toast("Copie automatique impossible : le message est sélectionné, faites « Copier ».", { erreur: true, duree: 6000 });
+  }
+}
+
+/* ---------- ☕ v1.02 — Soutenir l'appli ----------
+   Un don facultatif, par PayPal. L'appli ne fait que montrer l'adresse : le paiement se passe chez PayPal. */
+
+function ecranSoutienHTML() { // v1.02
+  return `<div class="ecran" role="dialog" aria-modal="true" aria-labelledby="titre-soutien">
+    <div class="ecran-entete"><button type="button" class="btn-icone" data-action="fermer" aria-label="Fermer">✕</button><h1 id="titre-soutien">Soutenir l'appli</h1><span></span></div>
+    <div class="ecran-corps">
+      <p class="champ">Ma Compta Perso est gratuite et sans pub, et elle le restera. Si elle vous rend service, vous pouvez soutenir son éditeur par un petit don, du montant de votre choix.</p>
+      <p class="champ champ-aide">C'est facultatif : sans don, l'appli marche exactement pareil.</p>
+      <div class="champ"><span>Par PayPal</span>
+        <ol class="etapes-don">
+          <li>Copiez l'adresse PayPal de l'éditeur : <strong class="adresse" id="adresse-paypal">${esc(EDITEUR_PAYPAL)}</strong></li>
+          <li>Dans votre appli PayPal (ou sur paypal.com), touchez « Envoyer », collez l'adresse et choisissez le montant.</li>
+        </ol>
+      </div>
+      <div class="actions champ">
+        <button type="button" class="btn btn-principal" data-action="copier-paypal">📋 Copier l'adresse PayPal</button>
+        <a class="btn" href="${esc(LIEN_PAYPAL)}" target="_blank" rel="noopener noreferrer">Ouvrir PayPal ↗</a>
+      </div>
+      <p class="champ champ-aide">Le paiement se fait chez PayPal : l'appli n'en voit rien, et vos chiffres ne sont jamais envoyés.</p>
+      <p class="champ">Merci ! 🙏</p>
+    </div>
+  </div>`;
+}
+
+async function copierPaypal() { // v1.02
+  try {
+    await navigator.clipboard.writeText(EDITEUR_PAYPAL);
+    toast("Adresse copiée ✓ Collez-la dans PayPal, à « Envoyer ».", { duree: 6000 });
+  } catch {
+    const zone = $("#adresse-paypal");
+    if (zone) getSelection().selectAllChildren(zone);
+    toast("Copie automatique impossible : l'adresse est sélectionnée, faites « Copier ».", { erreur: true, duree: 6000 });
+  }
+}
+
 /* ---------- 👋 Guide du 1er lancement ---------- */
 
 function nouveauGuide() {
@@ -1310,6 +1491,7 @@ function ecranGuideHTML() {
         <button type="button" class="btn btn-large" data-action="guide-exemples">▶ Essayer avec des exemples</button>
         <button type="button" class="btn btn-discret btn-large" data-action="restaurer">J'ai une sauvegarde : la restaurer</button>
         ${etat.copieRestauration ? `<button type="button" class="btn btn-discret btn-large" data-action="annuler-restauration">🛟 Revenir à l'état d'avant la dernière restauration</button>` : ""}
+        ${etat.copieMiseAJour ? `<button type="button" class="btn btn-discret btn-large" data-action="revenir-avant-maj">🛟 Revenir à l'état d'avant la mise à jour</button>` : ""}<!-- v1.02 — le cas grave : une mise à jour qui aurait tout effacé ramène ici -->
       </div>
     </div>`;
   }
@@ -1627,6 +1809,42 @@ async function annulerRestauration() {
   await apresRestauration("Retour à l'état d'avant la restauration ✓");
 }
 
+/** v1.02 — 🛟 Revenir à l'état laissé par l'ancienne version, juste avant la dernière mise à jour.
+ *  Comme une restauration : l'état actuel est gardé à son tour (« Revenir à l'état d'avant la dernière
+ *  restauration »), dans la MÊME opération. On montre les chiffres des deux côtés pour décider en connaissance de cause. */
+async function revenirAvantMiseAJour() {
+  const copie = await S.lireCopieSecurite("avant-mise-a-jour");
+  if (!copie) return;
+  const v = C.verifierSauvegarde(copie.contenu?.sauvegarde);
+  if (!v.ok) {
+    await alerte("Retour impossible", v.erreur);
+    return;
+  }
+  const s = v.sauvegarde;
+  const nbOps = s.operations.filter((o) => !o.supprime).length;
+  const nbComptes = s.comptes.filter((c) => !c.supprime).length;
+  const textes = [`Copie faite automatiquement le ${dateHeure(copie.cree_le)}, juste avant la version ${copie.contenu.vers ?? "?"} : ${pluriel(nbComptes, "compte", "comptes")}, ${pluriel(nbOps, "opération", "opérations")}.`];
+  if (etat.meta) {
+    const actuelles = etat.operations.filter((o) => !o.supprime).length;
+    textes.push(`Elle va REMPLACER les données actuelles (${pluriel(actuelles, "opération", "opérations")}) : ce qui a été noté ou modifié depuis la copie disparaîtra.`);
+    textes.push("Les données actuelles sont gardées à leur tour en copie de sécurité : vous pourrez revenir en arrière.");
+  }
+  const ok = await confirmer({ titre: "Revenir à l'état d'avant la mise à jour ?", textes, ok: "Revenir en arrière", danger: true });
+  if (!ok) return;
+  const ancienne = copie.contenu.meta || {};
+  const copieActuelle = etat.meta ? { cle: "avant-restauration", contenu: { sauvegarde: sauvegardeActuelle(), meta: etat.meta } } : null;
+  // v1.02 — n° de format et version TOUJOURS ceux d'aujourd'hui (les données ont été vérifiées, et converties si besoin,
+  // par verifierSauvegarde) : l'ancienne « meta » ne doit pas les remettre à leur valeur d'avant.
+  const metaEnPlus = { ...(etat.meta ? {} : ancienne), schema: C.SCHEMA, version_appli: VERSION, derniere_sauvegarde: ancienne.derniere_sauvegarde ?? null, exemple: Boolean(ancienne.exemple) };
+  try {
+    await appliquerSauvegarde(s, metaEnPlus, copieActuelle); // copie de l'état actuel ET retour arrière : tout ou rien
+  } catch (e) {
+    await alerte("Retour impossible", `Rien n'a été modifié. Détail : ${e.message}`);
+    return;
+  }
+  await apresRestauration("Retour à l'état d'avant la mise à jour ✓");
+}
+
 /* =====================================================================
    TOAST (message en bas) ET DIALOGUES
    ===================================================================== */
@@ -1779,6 +1997,15 @@ const ACTIONS = {
   "ouvrir-partage": () => ouvrir({ type: "partage" }), // v1.01
   "partager-appli": () => partagerAppli(), // v1.01
   "copier-message": () => copierMessage(), // v1.01
+  "ouvrir-avis": () => ouvrir({ type: "avis", genre: "idee", note: 0, texte: "" }), // v1.02
+  "genre-avis": (el) => choisirGenreAvis(el.dataset.genre), // v1.02
+  "note-avis": (el) => noterAvis(Number(el.dataset.note)), // v1.02
+  "envoyer-avis": (_el, e) => envoyerAvis(e), // v1.02 — sans « async » : le lien doit pouvoir être arrêté tout de suite
+  "partager-avis": () => partagerAvis(), // v1.02
+  "copier-avis": () => copierAvis(), // v1.02
+  "ouvrir-soutien": () => ouvrir({ type: "soutien" }), // v1.02
+  "copier-paypal": () => copierPaypal(), // v1.02
+  "revenir-avant-maj": () => revenirAvantMiseAJour(), // v1.02
   "effacer-exemples": () => effacerExemples(),
   "sauvegarde-rapide": () => sauvegardeRapide(),
   "sauvegarder-fichier": () => sauvegarderFichier(),
@@ -1847,6 +2074,11 @@ const SUR_INPUT = {
   "partage-prenom": (el) => {
     const zone = $("#message-partage"); // v1.01 — l'aperçu du message suit la frappe
     if (zone) zone.textContent = C.messagePartage(el.value, ADRESSE_APPLI); // v1.01
+  },
+  "avis-texte": (el) => {
+    const haut = etat.pile[etat.pile.length - 1]; // v1.02 — gardé dans l'écran ouvert : rien de perdu s'il est redessiné
+    if (haut?.type === "avis") haut.texte = el.value; // v1.02
+    majAvis(); // v1.02
   },
 };
 

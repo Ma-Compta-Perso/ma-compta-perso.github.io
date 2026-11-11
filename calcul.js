@@ -775,6 +775,124 @@ export function messagePartage(prenom, adresse) {
 }
 
 /* =====================================================================
+   v1.02 — COPIE DE SÉCURITÉ AVANT UNE MISE À JOUR (🛟)
+   Au 1er lancement d'une nouvelle version, l'état laissé par l'ancienne est mis de côté :
+   même un bug que les tests n'auraient pas vu ne pourrait pas faire perdre de données.
+   ===================================================================== */
+
+/** v1.02 — « 1.02 » → [1, 2] ; null si ce n'est pas un n° de version lisible. */
+export function lireVersion(v) {
+  const m = /^(\d+)\.(\d+)/.exec(String(v ?? ""));
+  return m ? [Number(m[1]), Number(m[2])] : null;
+}
+
+/** v1.02 — Faut-il une copie de sécurité au 1er lancement de la version `versionActuelle` ?
+ *  Oui quand les données ont été laissées par une AUTRE version, plus ancienne (ou inconnue).
+ *  Non : sans données ; avec les données d'exemple (inventées : une copie d'elles pourrait remplacer celle
+ *  de vrais chiffres) ; ou si une version plus RÉCENTE les a déjà ouvertes (un vieil onglet resté ouvert
+ *  ne doit pas écraser la copie faite par la vraie mise à jour). */
+export function copieAvantMiseAJourNecessaire(meta, versionActuelle) {
+  if (!meta || typeof meta !== "object" || meta.exemple) return false;
+  const avant = meta.version_appli;
+  if (avant === versionActuelle) return false;
+  const a = lireVersion(avant);
+  const b = lireVersion(versionActuelle);
+  if (a && b && (a[0] > b[0] || (a[0] === b[0] && a[1] > b[1]))) return false;
+  return true;
+}
+
+/* =====================================================================
+   v1.02 — DONNER SON AVIS : le message que l'appli PRÉPARE (la personne l'envoie elle-même).
+   Jamais un compte ni un montant dedans : ce que la personne a écrit, sa note éventuelle, la version,
+   et, pour un problème seulement, le type d'appareil (de quoi reproduire le problème). Tout est visible dans l'aperçu.
+   ===================================================================== */
+
+export const TYPES_AVIS = Object.freeze([
+  Object.freeze({ id: "idee", icone: "💡", nom: "Une idée", titre: "Une idée pour Ma Compta Perso", sujet: "idée" }),
+  Object.freeze({ id: "probleme", icone: "🐞", nom: "Un problème", titre: "Un problème dans Ma Compta Perso", sujet: "problème" }),
+  Object.freeze({ id: "avis", icone: "👍", nom: "Un avis", titre: "Mon avis sur Ma Compta Perso", sujet: "avis" }),
+]);
+
+export const MAX_AVIS = 1000; // v1.02 — un message, pas un roman : il tient dans un lien « mailto », quelle que soit la messagerie
+
+/** v1.02 — « ★★★★☆ » pour une note de 4 sur 5 ; "" sans note (ou une note impossible). */
+export function etoilesNote(note) {
+  if (!Number.isInteger(note) || note < 1 || note > 5) return "";
+  return "★".repeat(note) + "☆".repeat(5 - note);
+}
+
+/** v1.02 — Système et navigateur, lus dans l'« user agent » du navigateur. Ex. « Android · Chrome 131 ». */
+export function decrireAppareil(ua) {
+  const u = String(ua ?? "");
+  const systeme = /Android/.test(u)
+    ? "Android"
+    : /iPhone|iPod/.test(u)
+      ? "iPhone"
+      : /iPad/.test(u)
+        ? "iPad"
+        : /Windows/.test(u)
+          ? "Windows"
+          : /CrOS/.test(u)
+            ? "ChromeOS"
+            : /Macintosh|Mac OS X/.test(u)
+              ? "Mac"
+              : /Linux/.test(u)
+                ? "Linux"
+                : "système inconnu";
+  // L'ordre compte : Edge, Samsung Internet et Opera se présentent AUSSI comme « Chrome ».
+  const navigateurs = [
+    [/EdgA?\/(\d+)/, "Edge"],
+    [/EdgiOS\/(\d+)/, "Edge"],
+    [/SamsungBrowser\/(\d+)/, "Samsung Internet"],
+    [/OPR\/(\d+)/, "Opera"],
+    [/FxiOS\/(\d+)/, "Firefox"],
+    [/Firefox\/(\d+)/, "Firefox"],
+    [/CriOS\/(\d+)/, "Chrome"],
+    [/Chrome\/(\d+)/, "Chrome"],
+    [/Version\/(\d+)[\d.]* (?:Mobile\/\S+ )?Safari\//, "Safari"],
+  ];
+  for (const [motif, nom] of navigateurs) {
+    const m = motif.exec(u);
+    if (m) return `${systeme} · ${nom} ${m[1]}`;
+  }
+  return `${systeme} · navigateur inconnu`;
+}
+
+/** v1.02 — La ligne d'infos techniques jointe à un problème. Rien de personnel : pas de compte, pas de montant. */
+export function infosAppareil({ ua, largeur, hauteur, installee, taille, theme }) {
+  const themes = { auto: "auto", clair: "clair", sombre: "sombre" };
+  return [
+    decrireAppareil(ua),
+    installee ? "appli installée" : "dans le navigateur",
+    `écran ${Math.round(Number(largeur) || 0)} × ${Math.round(Number(hauteur) || 0)}`,
+    `texte ${Math.round(Number(taille) || 100)} %`,
+    `thème ${themes[theme] ?? "auto"}`,
+  ].join(" · ");
+}
+
+/** v1.02 — Le message d'avis : { sujet, corps }. La note ne compte que pour « Un avis » ; `infos` que pour « Un problème ». */
+export function messageAvis({ type, note = 0, texte = "", version, infos = "" }) {
+  const t = TYPES_AVIS.find((x) => x.id === type) ?? TYPES_AVIS[0];
+  const etoiles = t.id === "avis" ? etoilesNote(note) : "";
+  const message = String(texte ?? "")
+    .replace(/\r\n?/g, "\n")
+    .trim()
+    .slice(0, MAX_AVIS);
+  const lignes = [`${t.icone} ${t.titre}`, ""];
+  if (etoiles) lignes.push(`Ma note : ${etoiles} (${note}/5)`, "");
+  if (message) lignes.push(message, "");
+  lignes.push("—", t.id === "probleme" && infos ? `Version ${version} · ${infos}` : `Version ${version}`);
+  return { sujet: `Ma Compta Perso – ${t.sujet}${etoiles ? ` ${etoiles}` : ""} (v${version})`, corps: lignes.join("\n") };
+}
+
+/** v1.02 — Le lien « mailto: » qui ouvre la messagerie avec le message déjà écrit.
+ *  Retours à la ligne en %0D%0A (la règle des liens mailto, RFC 6068) ; tout le reste est encodé. */
+export function lienMail(adresse, sujet, corps) {
+  const encoder = (s) => encodeURIComponent(String(s ?? "").replace(/\r?\n/g, "\r\n"));
+  return `mailto:${adresse}?subject=${encoder(sujet)}&body=${encoder(corps)}`;
+}
+
+/* =====================================================================
    DONNÉES D'EXEMPLE (« ▶ Essayer avec des exemples ») — le même générateur sert aux tests.
    Tirage pseudo-aléatoire « à graine » : mêmes paramètres → mêmes données, toujours.
    ===================================================================== */

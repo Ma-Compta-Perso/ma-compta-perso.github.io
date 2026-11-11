@@ -34,6 +34,14 @@ vérification que chaque fichier de l'appli est bien gardé pour le hors ligne. 
 (`icones/qr-ma-compta.svg`) a été vérifié à sa fabrication avec un vrai lecteur de QR code : il redonne
 exactement https://ma-compta-perso.github.io/ .
 
+v1.02 — Ajoutés : « 💬 Donner mon avis » (le message est préparé mais jamais envoyé par l'appli ; aucun compte
+ni montant dedans ; le lien « mailto » porte exactement l'aperçu ; un message vide ne part pas ; le texte tapé
+survit si l'écran est redessiné), « ☕ Soutenir l'appli » (adresse PayPal affichée et copiée, lien PayPal ouvert à
+part), l'adresse de l'éditeur jamais écrite en clair dans les fichiers, et la copie de sécurité avant chaque mise à
+jour (faite une seule fois au 1er lancement d'une nouvelle version ; jamais pour les exemples ni à cause d'un vieil
+onglet ; retour en arrière réversible, même depuis le guide ; si le téléphone est plein, l'appli démarre quand même
+et la copie est retentée). Chaque nouveau test a été vérifié : il ÉCHOUE si on remet le bug.
+
 S'y ajoutent les tests issus de la relecture indépendante du code (chacun a été vérifié : il ÉCHOUE si on
 remet le bug) : « ↶ Annuler » jamais sous le doigt par erreur, double toucher (jamais 2 comptes, jamais 2
 retours arrière), sauvegarde d'exemple restaurée par erreur puis effacée (la copie de sécurité survit),

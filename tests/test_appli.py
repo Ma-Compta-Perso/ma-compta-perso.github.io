@@ -9,6 +9,7 @@
 # tailles d'écran (téléphone 412 et 360, PC demi-écran 728 à 125 %, plein écran 1536), texte 150 %,
 # mode sombre, aucun défilement horizontal, aucune erreur de console, aucun appel réseau extérieur,
 # et le même n° de version partout.
+# v1.01 — + partager l'appli, bouton « Plus tard ». v1.02 — + donner son avis, soutenir l'appli, copie avant mise à jour.
 # Toutes les données sont FABRIQUÉES ici : jamais de vraies données.
 
 import argparse
@@ -25,6 +26,7 @@ import tempfile
 import threading
 import time
 import traceback
+import urllib.parse  # v1.02 — pour relire le lien « mailto » du message d'avis
 from pathlib import Path
 
 from playwright.sync_api import expect, sync_playwright
@@ -430,6 +432,9 @@ def test_mise_a_jour(nav, _srv):
         page.wait_for_selector(".solde-chiffre")
         assert version_affichee(page) == v1, "la version reportée doit s'installer à la réouverture"
         assert [o["montant"] for o in s.base()["operations"]] == [-700], "données perdues à la mise à jour"
+        copie_maj = page.evaluate(COPIE_MAJ)  # v1.02 — 🛟 la copie faite au 1er lancement (« copie » = le dossier de l'appli, plus haut)
+        assert copie_maj and copie_maj["de"] == v0 and copie_maj["vers"] == v1 and copie_maj["montants"] == [-700], copie_maj
+        expect(page.locator('[data-action="revenir-avant-maj"]')).to_contain_text(f"juste avant la version {v1}")  # v1.02
 
         # 2) « Mettre à jour » : installation immédiate, données intactes.
         publier(v1, v2)
@@ -441,6 +446,8 @@ def test_mise_a_jour(nav, _srv):
         page.wait_for_selector(".solde-chiffre")
         assert version_affichee(page) == v2
         assert [o["montant"] for o in s.base()["operations"]] == [-700], "données perdues à la mise à jour"
+        copie_maj2 = page.evaluate(COPIE_MAJ)  # v1.02 — une seule copie, remplacée à chaque mise à jour
+        assert copie_maj2["de"] == v1 and copie_maj2["vers"] == v2 and copie_maj2["cree_le"] > copie_maj["cree_le"], copie_maj2
         s.fermer()
     finally:
         srv.arreter()
@@ -853,6 +860,235 @@ def test_partage(nav, srv):
     s2.fermer()
 
 
+def adresse_editeur():
+    """v1.02 — L'adresse de l'éditeur, recomposée à partir de app.js (elle n'est écrite en clair NULLE PART, même ici)."""
+    app = (RACINE / "app.js").read_text(encoding="utf-8")
+    morceaux = re.search(r'const EDITEUR_MAIL = \[([^\]]+)\]\.join\("@"\);', app).group(1)
+    return "@".join(re.findall(r'"([^"]+)"', morceaux))
+
+
+def surveiller_lien(page, selecteur):
+    """v1.02 — Note si l'appli a arrêté le lien (message vide), puis l'arrête de toute façon : pendant les tests,
+    on ne lance jamais la vraie messagerie. L'écouteur est sur window : il passe APRÈS celui de l'appli."""
+    page.evaluate(
+        """(sel) => window.addEventListener('click', (e) => {
+          if (e.target.closest(sel)) { window.__lienArrete = e.defaultPrevented; e.preventDefault(); }
+        })""",
+        selecteur,
+    )
+
+
+def test_avis(nav, srv):
+    """v1.02 — Donner mon avis : l'appli prépare le message, ne l'envoie jamais elle-même, n'y met aucun chiffre ;
+    le lien « mailto » porte exactement l'aperçu ; un message vide ne part pas ; le texte survit à un redessin."""
+    s = Session(nav, srv)
+    s.ctx.grant_permissions(["clipboard-read", "clipboard-write"], origin=srv.url.rstrip("/"))
+    s.page.add_init_script("navigator.share = (d) => { window.__partage = d; return Promise.resolve(); }; navigator.canShare = () => false;")
+    page = s.ouvrir()
+    guide(page, solde="1234,56", nom="Compte secret")
+    saisir(page, "42,5", "def-courses")
+    onglet(page, "reglages")
+    page.click('[data-action="ouvrir-avis"]')
+    page.wait_for_selector("#apercu-avis")
+    surveiller_lien(page, "#avis-mail")
+    expect(page.locator('[data-action="genre-avis"][aria-pressed="true"]')).to_have_attribute("data-genre", "idee")
+    expect(page.locator("#avis-note")).to_be_hidden()
+
+    # Message vide : le lien est arrêté, et on le dit ; Copier et Partager refusent aussi.
+    page.click("#avis-mail")
+    expect(page.locator("#toast")).to_contain_text("Écrivez d'abord")
+    assert page.evaluate("window.__lienArrete") is True, "un message vide ne doit pas ouvrir la messagerie"
+    for action in ["copier-avis", "partager-avis"]:
+        page.evaluate("document.querySelector('#toast').textContent = ''")
+        page.click(f'[data-action="{action}"]')
+        expect(page.locator("#toast")).to_contain_text("Écrivez d'abord")
+    assert page.evaluate("window.__partage") is None
+
+    # Une idée, puis un avis noté 4/5 (le texte tapé reste en changeant de genre).
+    page.fill("#avis-texte", "Pouvoir trier par montant")
+    expect(page.locator("#apercu-avis")).to_contain_text("💡 Une idée pour Ma Compta Perso")
+    expect(page.locator("#apercu-avis")).to_contain_text("Pouvoir trier par montant")
+    page.click('[data-genre="avis"]')
+    expect(page.locator("#avis-note")).to_be_visible()
+    page.click('[data-note="4"]')
+    expect(page.locator("#apercu-avis")).to_contain_text("Ma note : ★★★★☆ (4/5)")
+    page.click('[data-note="4"]')  # la même étoile retouchée : plus de note
+    expect(page.locator("#apercu-avis")).not_to_contain_text("Ma note")
+    page.click('[data-note="5"]')
+    assert page.input_value("#avis-texte") == "Pouvoir trier par montant"
+
+    # Un problème : infos techniques jointes, la note ne compte plus.
+    page.click('[data-genre="probleme"]')
+    expect(page.locator("#avis-note")).to_be_hidden()
+    apercu = page.evaluate("document.querySelector('#apercu-avis').textContent")
+    version = re.search(r'const VERSION = "([\d.]+)"', (RACINE / "app.js").read_text(encoding="utf-8")).group(1)
+    assert apercu.startswith("🐞 Un problème dans Ma Compta Perso\n\nPouvoir trier par montant\n"), apercu
+    assert f"Version {version} · " in apercu and "écran 412 × 915" in apercu and "★" not in apercu, apercu
+
+    # Le lien = l'aperçu, au caractère près, vers l'adresse de l'éditeur ; aucun chiffre, aucun nom de compte.
+    href = page.get_attribute("#avis-mail", "href")
+    destinataire, _, requete = href.removeprefix("mailto:").partition("?")
+    assert destinataire == adresse_editeur() == page.inner_text(".adresse"), destinataire
+    params = urllib.parse.parse_qs(requete)
+    assert params["subject"] == [f"Ma Compta Perso – problème (v{version})"], params["subject"]
+    corps = params["body"][0]
+    assert corps == apercu.replace("\n", "\r\n"), "le lien mailto doit porter exactement l'aperçu"
+    for secret in ["Compte secret", "1 234,56", "1234,56", "1 192,06", "42,5"]:
+        assert secret not in corps, f"« {secret} » ne doit jamais partir dans un avis"
+    page.click("#avis-mail")
+    assert page.evaluate("window.__lienArrete") is False, "un vrai message doit ouvrir la messagerie"
+    expect(page.locator("#toast")).to_contain_text("Votre messagerie s'ouvre")
+
+    # Copier et Partager donnent le même message.
+    page.click('[data-action="copier-avis"]')
+    expect(page.locator("#toast")).to_contain_text("Message copié")
+    assert page.evaluate("navigator.clipboard.readText()") == apercu
+    page.click('[data-action="partager-avis"]')
+    assert page.evaluate("window.__partage") == {"text": apercu}
+
+    # Une autre fenêtre écrit dans la base : l'écran est redessiné, le texte et le genre restent.
+    page.evaluate("document.querySelector('#avis-texte').dataset.ancien = '1'")
+    b = s.nouvelle_page()
+    b.wait_for_selector(".solde-chiffre")
+    saisir(b, "1", "def-courses")
+    attendre(page, "() => { const t = document.querySelector('#avis-texte'); return t && !t.dataset.ancien; }")
+    assert page.input_value("#avis-texte") == "Pouvoir trier par montant", "le texte tapé a été perdu au redessin"
+    expect(page.locator('[data-action="genre-avis"][aria-pressed="true"]')).to_have_attribute("data-genre", "probleme")
+    b.close()
+    s.fermer()
+
+
+def test_soutien(nav, srv):
+    """v1.02 — Soutenir l'appli : l'adresse PayPal affichée et copiée ; « Ouvrir PayPal » part dans un autre onglet,
+    sans transmettre l'adresse de l'appli ; ouvrir l'écran ne contacte rien à l'extérieur (Session le surveille)."""
+    s = Session(nav, srv)
+    s.ctx.grant_permissions(["clipboard-read", "clipboard-write"], origin=srv.url.rstrip("/"))
+    page = s.ouvrir()
+    guide(page)
+    onglet(page, "reglages")
+    page.click('[data-action="ouvrir-soutien"]')
+    page.wait_for_selector("#adresse-paypal")
+    assert page.inner_text("#adresse-paypal") == adresse_editeur()
+    page.click('[data-action="copier-paypal"]')
+    expect(page.locator("#toast")).to_contain_text("Adresse copiée")
+    assert page.evaluate("navigator.clipboard.readText()") == adresse_editeur()
+    lien = page.locator('a:has-text("Ouvrir PayPal")')
+    assert lien.get_attribute("href") == "https://www.paypal.com/"
+    assert lien.get_attribute("target") == "_blank"
+    assert {"noopener", "noreferrer"} <= set(lien.get_attribute("rel").split())
+    page.keyboard.press("Escape")
+    page.wait_for_selector("#adresse-paypal", state="detached")
+    s.fermer()
+
+
+COPIE_MAJ = """async () => {
+  const S = await import("./stockage.js");
+  const c = await S.lireCopieSecurite("avant-mise-a-jour");
+  return c && { cree_le: c.cree_le, de: c.contenu.de, vers: c.contenu.vers, montants: c.contenu.sauvegarde.operations.map((o) => o.montant) };
+}"""
+
+POSER_VERSION = """async (v) => {
+  const S = await import("./stockage.js");
+  const d = await S.chargerTout();
+  await S.ecrire({ parametres: { meta: { ...d.meta, version_appli: v } } });
+}"""
+
+
+def test_copie_avant_mise_a_jour(nav, srv):
+    """v1.02 — 🛟 Au 1er lancement d'une nouvelle version : copie de l'état laissé par l'ancienne, une seule fois ;
+    jamais pour des exemples ni à cause d'un vieil onglet ; retour en arrière réversible, même depuis le guide."""
+    version = re.search(r'const VERSION = "([\d.]+)"', (RACINE / "app.js").read_text(encoding="utf-8")).group(1)
+    s = Session(nav, srv)
+    page = s.ouvrir()
+    guide(page)
+    saisir(page, "7", "def-courses")
+    assert page.evaluate(COPIE_MAJ) is None, "pas de copie sans mise à jour"
+
+    # Des données laissées par la version 1.01 : au lancement, copie, et la version est notée.
+    page.evaluate(POSER_VERSION, "1.01")
+    page.reload()
+    page.wait_for_selector(".solde-chiffre")
+    copie = page.evaluate(COPIE_MAJ)
+    assert copie and copie["de"] == "1.01" and copie["vers"] == version and copie["montants"] == [-700], copie
+    assert s.base()["meta"]["version_appli"] == version
+    page.reload()  # 2e lancement de la même version : la copie n'est pas refaite
+    page.wait_for_selector(".solde-chiffre")
+    assert page.evaluate(COPIE_MAJ)["cree_le"] == copie["cree_le"], "la copie ne doit être faite qu'au 1er lancement"
+
+    # Un vieil onglet (version plus ancienne que les données) ne touche pas à la copie.
+    page.evaluate(POSER_VERSION, "9.99")
+    page.reload()
+    page.wait_for_selector(".solde-chiffre")
+    assert page.evaluate(COPIE_MAJ)["cree_le"] == copie["cree_le"], "un vieil onglet a écrasé la copie"
+    assert s.base()["meta"]["version_appli"] == "9.99"
+    page.evaluate(POSER_VERSION, version)
+
+    # Revenir en arrière : on voit les chiffres des deux côtés, et c'est réversible.
+    saisir(page, "3", "def-courses")
+    onglet(page, "reglages")
+    bouton = page.locator('[data-action="revenir-avant-maj"]')
+    expect(bouton).to_contain_text(f"juste avant la version {version}")
+    bouton.click()
+    expect(page.locator("#dialogue")).to_contain_text("1 opération.")
+    expect(page.locator("#dialogue")).to_contain_text("(2 opérations)")
+    page.click('#dialogue [data-reponse="oui"]')
+    expect(page.locator("#toast")).to_contain_text("Retour à l'état d'avant la mise à jour")
+    assert sorted(o["montant"] for o in s.base()["operations"] if not o["supprime"]) == [-700]
+    onglet(page, "reglages")
+    page.click('[data-action="annuler-restauration"]')
+    page.click('#dialogue [data-reponse="oui"]')
+    expect(page.locator("#toast")).to_contain_text("Retour à l'état d'avant la restauration")
+    assert sorted(o["montant"] for o in s.base()["operations"] if not o["supprime"]) == [-700, -300]
+
+    # Le cas grave : une mise à jour qui aurait tout effacé. Le guide propose la copie.
+    avant_retour = page.evaluate(COPIE_MAJ)["cree_le"]
+    page.evaluate("async () => { const S = await import('./stockage.js'); await S.toutEffacer(); }")
+    page.reload()
+    page.wait_for_selector(".guide-titre")
+    page.click('[data-action="revenir-avant-maj"]')
+    expect(page.locator("#dialogue")).to_contain_text("1 opération.")
+    page.click('#dialogue [data-reponse="oui"]')
+    page.wait_for_selector(".solde-chiffre")
+    base = s.base()
+    assert [o["montant"] for o in base["operations"]] == [-700]
+    assert base["meta"]["version_appli"] == version and base["meta"]["schema"] == 1, base["meta"]
+    assert page.evaluate(COPIE_MAJ)["cree_le"] == avant_retour, "le retour en arrière ne doit pas refaire la copie d'avant la mise à jour"
+    s.fermer()
+
+    # Téléphone plein (la copie est refusée) : l'appli démarre quand même, la version n'est PAS notée
+    # (copie et version vont ensemble : la copie sera retentée au prochain lancement), et l'erreur est signalée.
+    s3 = Session(nav, srv)
+    s3.page.add_init_script(
+        """(() => { const put = IDBObjectStore.prototype.put;
+          IDBObjectStore.prototype.put = function (valeur, cle) {
+            if (this.name === "securite" && cle === "avant-mise-a-jour") throw new DOMException("Plus de place", "QuotaExceededError");
+            return put.apply(this, arguments);
+          }; })();"""
+    )
+    page = s3.ouvrir()
+    guide(page)
+    page.evaluate(POSER_VERSION, "1.01")
+    page.reload()
+    page.wait_for_selector(".solde-chiffre")
+    assert page.evaluate(COPIE_MAJ) is None
+    assert s3.base()["meta"]["version_appli"] == "1.01", "version notée alors que la copie a échoué"
+    onglet(page, "reglages")
+    expect(page.locator(".a-propos")).to_contain_text("Copie de sécurité d'avant la mise à jour impossible")
+    s3.fermer()
+
+    # Données d'EXEMPLE : jamais de copie (elle pourrait remplacer celle de vrais chiffres).
+    s2 = Session(nav, srv)
+    page = s2.ouvrir()
+    exemples(page)
+    page.evaluate(POSER_VERSION, "1.00")
+    page.reload()
+    page.wait_for_selector(".solde-chiffre")
+    assert page.evaluate(COPIE_MAJ) is None, "copie faite pour des données d'exemple"
+    onglet(page, "reglages")
+    assert page.locator('[data-action="revenir-avant-maj"]').count() == 0
+    s2.fermer()
+
+
 def test_installable(nav, srv):
     """On demande à Chrome lui-même (son protocole de débogage) si l'appli est installable."""
     s = Session(nav, srv)
@@ -886,6 +1122,10 @@ def test_version(zip_nom):
     for f in RACINE.glob("*.js"):
         contenu = f.read_text(encoding="utf-8")
         assert "console.log" not in contenu and "debugger" not in contenu, f"reste de débogage dans {f.name}"
+    adresse = adresse_editeur()  # v1.02 — l'adresse de l'éditeur n'est écrite en clair dans AUCUN fichier livré (robots de GitHub)
+    for f in [p for p in RACINE.rglob("*") if p.is_file() and "__pycache__" not in p.parts]:
+        if f.suffix in {".js", ".mjs", ".py", ".html", ".css", ".md", ".webmanifest", ".svg", ".json", ".txt"}:
+            assert adresse not in f.read_text(encoding="utf-8"), f"adresse de l'éditeur en clair dans {f.relative_to(RACINE)}"
 
 
 def test_affichage(nav, srv, captures):
@@ -916,6 +1156,27 @@ def test_affichage(nav, srv, captures):
                 sans_debordement(page, f"{nom} partage")
                 page.keyboard.press("Escape")
                 page.wait_for_selector("#message-partage", state="detached")
+                page.click('[data-action="ouvrir-avis"]')  # v1.02 — « Donner mon avis », avec les étoiles (le plus large)
+                page.wait_for_selector("#apercu-avis")
+                page.click('[data-genre="avis"]')
+                page.click('[data-note="4"]')
+                page.fill("#avis-texte", "Très pratique au quotidien.")
+                page.evaluate("document.querySelector('.ecran-corps').scrollTo(0, 0)")
+                if captures:
+                    page.screenshot(path=str(captures / f"{nom}_avis.png"))
+                sans_debordement(page, f"{nom} avis")
+                derniere_etoile = page.locator('[data-note="5"]').bounding_box()
+                assert derniere_etoile["x"] + derniere_etoile["width"] <= page.viewport_size["width"], f"5e étoile coupée ({nom})"
+                assert derniere_etoile["height"] >= 44, f"étoiles trop petites pour le doigt ({nom})"
+                page.keyboard.press("Escape")
+                page.wait_for_selector("#apercu-avis", state="detached")
+                page.click('[data-action="ouvrir-soutien"]')  # v1.02 — « Soutenir l'appli »
+                page.wait_for_selector("#adresse-paypal")
+                if captures:
+                    page.screenshot(path=str(captures / f"{nom}_soutien.png"))
+                sans_debordement(page, f"{nom} soutien")
+                page.keyboard.press("Escape")
+                page.wait_for_selector("#adresse-paypal", state="detached")
                 page.click(".onglet-plus")
                 page.wait_for_selector(".pave")
                 taper(page, "42,9")
@@ -950,6 +1211,9 @@ def main():
             ("version", lambda: test_version(args.zip)),
             ("installable", lambda: test_installable(nav, srv)),
             ("partage", lambda: test_partage(nav, srv)),
+            ("avis", lambda: test_avis(nav, srv)),  # v1.02
+            ("soutien", lambda: test_soutien(nav, srv)),  # v1.02
+            ("copie avant mise à jour", lambda: test_copie_avant_mise_a_jour(nav, srv)),  # v1.02
             ("parcours complet", lambda: test_parcours_complet(nav, srv)),
             ("virement", lambda: test_virement(nav, srv)),
             ("mode bouton", lambda: test_mode_bouton(nav, srv)),

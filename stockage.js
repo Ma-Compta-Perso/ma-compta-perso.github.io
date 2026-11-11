@@ -10,7 +10,7 @@ const NOM_BASE = "ma-compta";
 // Toutes les tables, même celles des étapes suivantes (budgets, récurrences, règles), sont créées dès la v1.00.
 const VERSION_BASE = 1;
 const PARAMETRES = "parametres"; // clés « meta » et « reglages »
-const SECURITE = "securite"; // copies de sécurité automatiques (avant une restauration, avant une migration)
+const SECURITE = "securite"; // copies de sécurité automatiques (avant une restauration, avant une migration, et — v1.02 — avant une mise à jour)
 
 let base = null;
 
@@ -169,6 +169,16 @@ export async function lireCopieSecurite(cle) {
 export function effacerCopieSecurite(cle) {
   return transaction([SECURITE], "readwrite", (tx) => {
     tx.objectStore(SECURITE).delete(cle);
+  });
+}
+
+/** v1.02 — Au 1er lancement d'une nouvelle version : la copie de l'état actuel ET la « meta » qui note la nouvelle
+ *  version, dans UNE transaction. Pourquoi ensemble : si la copie échoue (téléphone plein…), la version n'est pas
+ *  notée non plus, et la copie sera retentée au prochain lancement. */
+export function ecrireCopieEtMeta(copie, meta) {
+  return transaction([PARAMETRES, SECURITE], "readwrite", (tx) => {
+    tx.objectStore(SECURITE).put({ cle: copie.cle, cree_le: new Date().toISOString(), contenu: copie.contenu }, copie.cle);
+    tx.objectStore(PARAMETRES).put(meta, "meta");
   });
 }
 

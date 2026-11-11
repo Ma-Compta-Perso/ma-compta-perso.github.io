@@ -3,7 +3,7 @@
 // ⚠️ Le n° de CACHE change à CHAQUE livraison (même si rien d'autre ne bouge ici) :
 // c'est ce changement qui prévient le téléphone qu'une nouvelle version existe.
 
-const CACHE = "ma-compta-v1.01"; // v1.01 — nouveau n° : c'est lui qui signale la nouvelle version aux téléphones
+const CACHE = "ma-compta-v1.02"; // v1.02 — nouveau n° : c'est lui qui signale la nouvelle version aux téléphones
 const FICHIERS = [
   "./",
   "index.html",

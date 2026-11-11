@@ -866,6 +866,60 @@ body.calque-ouvert {
   margin-top: 0.4rem;
 }
 
+/* v1.02 — Un lien qui a l'air d'un bouton (« ✉️ Envoyer par mail », « Ouvrir PayPal ») : sans soulignement,
+   et dans la couleur des boutons (pas le bleu des liens du navigateur). */
+a.btn {
+  text-decoration: none;
+  color: var(--encre);
+}
+
+a.btn-principal {
+  color: var(--sur-bleu); /* v1.02 — déclaré après « a.btn » : le texte reste lisible sur le fond bleu */
+}
+
+/* v1.02 — Donner mon avis : 3 genres de message, la note en étoiles */
+.segments-avis {
+  flex-wrap: wrap; /* v1.02 — à 150 % sur un petit téléphone, les 3 choix passent sur 2 lignes au lieu de sortir de l'écran */
+  border-radius: var(--rayon);
+}
+
+.segments-avis button {
+  flex: 1 1 auto;
+  border-radius: calc(var(--rayon) - 0.2rem);
+}
+
+.etoiles {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.etoile {
+  width: min(3rem, 17vw); /* v1.02 — 5 étoiles de 48 px au moins, sans dépasser sur un écran de 360 px à 150 % */
+  height: min(3rem, 17vw);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-size: min(1.9rem, 10vw);
+  line-height: 1;
+  color: var(--encre-douce);
+}
+
+.etoile[aria-pressed="true"] {
+  color: #e2a400; /* v1.02 — une étoile allumée : doré, lisible en clair comme en sombre */
+}
+
+/* v1.02 — Soutenir l'appli */
+.etapes-don {
+  margin: 0;
+  padding-left: 1.4rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.adresse {
+  overflow-wrap: anywhere; /* v1.02 — une adresse mail longue ne fait jamais déborder l'écran */
+}
+
 /* ============================== CHAMPS ============================== */
 
 .champ {

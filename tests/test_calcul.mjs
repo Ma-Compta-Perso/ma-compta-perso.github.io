@@ -528,6 +528,105 @@ test("v1.01 — message de partage : signé du prénom, sinon « Salut ! »", ()
   assert.equal(C.messagePartage("Rocco", adresse).split(adresse).length, 2, "l'adresse une seule fois");
 });
 
+/* ------------------------- v1.02 — copie avant mise à jour ------------------------- */
+
+test("v1.02 — n° de version lu en nombres (1.10 vient après 1.09, pas avant 1.2)", () => {
+  assert.deepEqual(C.lireVersion("1.02"), [1, 2]);
+  assert.deepEqual(C.lireVersion("1.10"), [1, 10]);
+  assert.deepEqual(C.lireVersion("2.00"), [2, 0]);
+  assert.deepEqual(C.lireVersion("1.02-test"), [1, 2]);
+  assert.equal(C.lireVersion(""), null);
+  assert.equal(C.lireVersion(undefined), null);
+  assert.equal(C.lireVersion("abc"), null);
+});
+
+test("v1.02 — copie avant mise à jour : seulement pour de vraies données laissées par une version plus ancienne", () => {
+  const vraie = (v) => ({ schema: 1, version_appli: v, exemple: false });
+  assert.equal(C.copieAvantMiseAJourNecessaire(vraie("1.01"), "1.02"), true, "1.01 → 1.02");
+  assert.equal(C.copieAvantMiseAJourNecessaire(vraie("1.00"), "1.02"), true, "une version sautée");
+  assert.equal(C.copieAvantMiseAJourNecessaire(vraie("1.09"), "1.10"), true, "1.09 → 1.10 (et pas 1.1 < 1.09)");
+  assert.equal(C.copieAvantMiseAJourNecessaire(vraie("1.99"), "2.00"), true, "1.99 → 2.00");
+  assert.equal(C.copieAvantMiseAJourNecessaire(vraie(undefined), "1.02"), true, "version inconnue : prudence");
+  assert.equal(C.copieAvantMiseAJourNecessaire({ schema: 1 }, "1.02"), true, "pas de n° du tout : prudence");
+  assert.equal(C.copieAvantMiseAJourNecessaire(vraie("1.02"), "1.02-test"), true, "version de test (même n°, autre nom)");
+  assert.equal(C.copieAvantMiseAJourNecessaire(vraie("1.02"), "1.02"), false, "même version : rien à faire");
+  assert.equal(C.copieAvantMiseAJourNecessaire(vraie("1.03"), "1.02"), false, "un vieil onglet ne doit pas écraser la copie");
+  assert.equal(C.copieAvantMiseAJourNecessaire(vraie("2.00"), "1.99"), false);
+  assert.equal(C.copieAvantMiseAJourNecessaire({ ...vraie("1.01"), exemple: true }, "1.02"), false, "données d'exemple : jamais");
+  assert.equal(C.copieAvantMiseAJourNecessaire(null, "1.02"), false, "aucune donnée : rien à copier");
+  assert.equal(C.copieAvantMiseAJourNecessaire(undefined, "1.02"), false);
+});
+
+/* ------------------------- v1.02 — donner son avis ------------------------- */
+
+const UA = {
+  chromeAndroid: "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+  samsung: "Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36",
+  edgeWindows: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+  chromeWindows: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  safariIPhone: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1",
+  chromeIPhone: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/131.0.6778.73 Mobile/15E148 Safari/604.1",
+  firefoxWindows: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
+  safariMac: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+};
+
+test("v1.02 — appareil et navigateur lus dans l'user agent (Edge et Samsung ne sont pas pris pour Chrome)", () => {
+  assert.equal(C.decrireAppareil(UA.chromeAndroid), "Android · Chrome 131");
+  assert.equal(C.decrireAppareil(UA.samsung), "Android · Samsung Internet 26");
+  assert.equal(C.decrireAppareil(UA.edgeWindows), "Windows · Edge 131");
+  assert.equal(C.decrireAppareil(UA.chromeWindows), "Windows · Chrome 131");
+  assert.equal(C.decrireAppareil(UA.safariIPhone), "iPhone · Safari 18");
+  assert.equal(C.decrireAppareil(UA.chromeIPhone), "iPhone · Chrome 131");
+  assert.equal(C.decrireAppareil(UA.firefoxWindows), "Windows · Firefox 133");
+  assert.equal(C.decrireAppareil(UA.safariMac), "Mac · Safari 18");
+  assert.equal(C.decrireAppareil(""), "système inconnu · navigateur inconnu");
+  assert.equal(C.decrireAppareil(undefined), "système inconnu · navigateur inconnu");
+});
+
+test("v1.02 — infos techniques : appareil, installée ou non, écran, texte, thème ; rien d'autre", () => {
+  const i = C.infosAppareil({ ua: UA.chromeAndroid, largeur: 412.4, hauteur: 915, installee: true, taille: 150, theme: "sombre" });
+  assert.equal(i, "Android · Chrome 131 · appli installée · écran 412 × 915 · texte 150 % · thème sombre");
+  const j = C.infosAppareil({ ua: UA.chromeWindows, largeur: 728, hauteur: 720, installee: false, taille: 100, theme: "n'importe quoi" });
+  assert.equal(j, "Windows · Chrome 131 · dans le navigateur · écran 728 × 720 · texte 100 % · thème auto");
+});
+
+test("v1.02 — note en étoiles : 1 à 5, sinon rien", () => {
+  assert.equal(C.etoilesNote(4), "★★★★☆");
+  assert.equal(C.etoilesNote(1), "★☆☆☆☆");
+  assert.equal(C.etoilesNote(5), "★★★★★");
+  for (const n of [0, 6, -1, 2.5, "4", null, undefined, NaN]) assert.equal(C.etoilesNote(n), "", `note ${n}`);
+});
+
+test("v1.02 — message d'avis : texte nettoyé, note pour « avis », infos techniques pour « problème » seulement", () => {
+  const idee = C.messageAvis({ type: "idee", note: 4, texte: "  Pouvoir trier par montant\r\nmerci  ", version: "1.02", infos: "Android · Chrome 131" });
+  assert.equal(idee.sujet, "Ma Compta Perso – idée (v1.02)");
+  assert.equal(idee.corps, "💡 Une idée pour Ma Compta Perso\n\nPouvoir trier par montant\nmerci\n\n—\nVersion 1.02");
+  assert.ok(!idee.corps.includes("★"), "la note ne compte que pour « Un avis »");
+  assert.ok(!idee.corps.includes("Android"), "les infos techniques ne partent que pour un problème");
+  const pb = C.messageAvis({ type: "probleme", texte: "Le bouton ne répond pas", version: "1.02", infos: "Android · Chrome 131" });
+  assert.equal(pb.sujet, "Ma Compta Perso – problème (v1.02)");
+  assert.ok(pb.corps.startsWith("🐞 Un problème dans Ma Compta Perso\n\nLe bouton ne répond pas\n"));
+  assert.ok(pb.corps.endsWith("—\nVersion 1.02 · Android · Chrome 131"));
+  const avis = C.messageAvis({ type: "avis", note: 4, texte: "Très pratique", version: "1.02" });
+  assert.equal(avis.sujet, "Ma Compta Perso – avis ★★★★☆ (v1.02)");
+  assert.equal(avis.corps, "👍 Mon avis sur Ma Compta Perso\n\nMa note : ★★★★☆ (4/5)\n\nTrès pratique\n\n—\nVersion 1.02");
+  const vide = C.messageAvis({ type: "inconnu", texte: "", version: "1.02" });
+  assert.equal(vide.corps, "💡 Une idée pour Ma Compta Perso\n\n—\nVersion 1.02", "type inconnu → idée ; sans texte : pas de ligne vide en trop");
+  assert.equal(C.messageAvis({ type: "idee", texte: "x".repeat(5000), version: "1.02" }).corps.split("\n")[2].length, C.MAX_AVIS);
+  assert.deepEqual(C.TYPES_AVIS.map((t) => t.id), ["idee", "probleme", "avis"]);
+});
+
+test("v1.02 — lien mailto : sujet et corps encodés, retours à la ligne en %0D%0A, rien de perdu", () => {
+  const m = C.messageAvis({ type: "avis", note: 5, texte: "Génial & simple ; 100 % ?\nOui", version: "1.02" });
+  const lien = C.lienMail("contact@exemple.fr", m.sujet, m.corps);
+  assert.ok(lien.startsWith("mailto:contact@exemple.fr?subject="), lien.slice(0, 50));
+  assert.ok(lien.includes("%0D%0A"), "retours à la ligne CRLF");
+  assert.ok(!/[\s&]/.test(lien.split("&body=")[1]), "aucun espace ni « & » brut dans le corps");
+  const params = new URLSearchParams(lien.split("?")[1]);
+  assert.equal(params.get("subject"), m.sujet);
+  assert.equal(params.get("body"), m.corps.replace(/\n/g, "\r\n"));
+});
+
 /* ------------------------- Exemples ------------------------- */
 
 test("données d'exemple : déterministes, montants entiers, dates valides, virements équilibrés", () => {
