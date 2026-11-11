@@ -1,0 +1,44 @@
+<!doctype html>
+<!-- index.html — v1.00 — création : la structure de la page (les écrans sont dessinés par app.js). -->
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- Sécurité : la page ne peut charger QUE ses propres fichiers. Aucun appel vers l'extérieur n'est possible. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Ma Compta Perso</title>
+    <meta name="description" content="Mes comptes perso : simple, privé, hors ligne." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f2f4f3" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#121619" media="(prefers-color-scheme: dark)" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icones/icone-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="icones/icone-180.png" />
+    <meta name="apple-mobile-web-app-title" content="Ma Compta" />
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <div class="appli" id="appli">
+      <nav class="onglets" id="onglets" aria-label="Navigation">
+        <button type="button" class="onglet" data-action="onglet" data-vue="accueil"><span class="onglet-icone" aria-hidden="true">🏠</span><span>Accueil</span></button>
+        <button type="button" class="onglet" data-action="onglet" data-vue="operations"><span class="onglet-icone" aria-hidden="true">📋</span><span>Opérations</span></button>
+        <button type="button" class="onglet onglet-plus" data-action="nouvelle-saisie" aria-label="Nouvelle opération"><span aria-hidden="true">+</span></button>
+        <button type="button" class="onglet" data-action="onglet" data-vue="stats"><span class="onglet-icone" aria-hidden="true">📊</span><span>Stats</span></button>
+        <button type="button" class="onglet" data-action="onglet" data-vue="reglages"><span class="onglet-icone" aria-hidden="true">⚙️</span><span>Réglages</span></button>
+      </nav>
+      <div class="bandeaux" id="bandeaux"></div>
+      <main class="vue" id="vue" tabindex="-1">
+        <p class="chargement">Chargement…</p>
+      </main>
+    </div>
+    <div class="calque" id="calque" hidden></div>
+    <dialog class="dialogue" id="dialogue"></dialog>
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+    <input type="file" id="fichier-restaurer" class="invisible" tabindex="-1" aria-hidden="true" />
+    <noscript><p class="chargement">Cette appli a besoin de JavaScript pour fonctionner.</p></noscript>
+  </body>
+</html>

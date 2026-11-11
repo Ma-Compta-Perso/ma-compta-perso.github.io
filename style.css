@@ -1,0 +1,1510 @@
+/* style.css — v1.00 — création : l'apparence de l'appli.
+   Couleurs en variables (mode clair / sombre), taille du texte réglable (--echelle), téléphone d'abord.
+   Polices du système uniquement : rien à télécharger, rien qui casse hors ligne. */
+
+/* ============================== COULEURS ============================== */
+
+:root {
+  --echelle: 1; /* taille du texte, réglée par l'appli (0,8 → 1,5) */
+  --fond: #f2f4f3; /* papier froid */
+  --surface: #ffffff;
+  --surface-2: #e8ecea;
+  --encre: #1e2a3a; /* le texte */
+  --encre-douce: #566273;
+  --trait: #d3d9d6;
+  --bleu: #2747a8; /* encre bleue : l'accent (bouton +, onglet actif) */
+  --bleu-pale: #e3e9f8;
+  --sur-bleu: #ffffff;
+  --rouge: #b3261e; /* les sorties : « être dans le rouge » */
+  --vert: #1b6e43; /* les entrées */
+  --neutre: #4b5875; /* les virements entre mes comptes */
+  --attention: #8a5300;
+  --attention-fond: #fbf0d9;
+  --danger-fond: #fbe5e3;
+  --ombre: 0 1px 2px rgb(30 42 58 / 0.08), 0 4px 16px rgb(30 42 58 / 0.08);
+  --rayon: 0.75rem;
+  --rayon-touche: 1rem;
+  color-scheme: light;
+  font-size: calc(var(--echelle) * 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="clair"]) {
+    --fond: #121619;
+    --surface: #1b2126;
+    --surface-2: #252d33;
+    --encre: #e6ebef;
+    --encre-douce: #9eaab6;
+    --trait: #323b42;
+    --bleu: #93abff;
+    --bleu-pale: #233052;
+    --sur-bleu: #0e1530;
+    --rouge: #ff8f85;
+    --vert: #71d6a0;
+    --neutre: #b4c0dd;
+    --attention: #ffcc80;
+    --attention-fond: #3b2c12;
+    --danger-fond: #3e1d1b;
+    --ombre: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.35);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="sombre"] {
+  --fond: #121619;
+  --surface: #1b2126;
+  --surface-2: #252d33;
+  --encre: #e6ebef;
+  --encre-douce: #9eaab6;
+  --trait: #323b42;
+  --bleu: #93abff;
+  --bleu-pale: #233052;
+  --sur-bleu: #0e1530;
+  --rouge: #ff8f85;
+  --vert: #71d6a0;
+  --neutre: #b4c0dd;
+  --attention: #ffcc80;
+  --attention-fond: #3b2c12;
+  --danger-fond: #3e1d1b;
+  --ombre: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.35);
+  color-scheme: dark;
+}
+
+/* ============================== BASE ============================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--fond);
+  color: var(--encre);
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.45;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+h2 {
+  font-size: 1.0625rem;
+  font-weight: 650;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation; /* pas de zoom au double toucher sur les boutons */
+}
+
+:focus-visible {
+  outline: 3px solid var(--bleu);
+  outline-offset: 2px;
+}
+
+[hidden] {
+  display: none !important; /* « hidden » gagne toujours, même sur un élément en grille ou en flex */
+}
+
+body.calque-ouvert {
+  overflow: hidden; /* la page du dessous ne défile pas pendant une saisie */
+}
+
+.invisible {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.montant {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.m-sortie {
+  color: var(--rouge);
+}
+
+.m-entree {
+  color: var(--vert);
+}
+
+.m-virement {
+  color: var(--neutre);
+}
+
+.doux {
+  color: var(--encre-douce);
+}
+
+.petit {
+  font-size: 0.875rem;
+}
+
+.chargement {
+  padding: 2rem 1rem;
+  color: var(--encre-douce);
+  text-align: center;
+}
+
+/* ============================== BOUTONS ============================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 3rem;
+  padding: 0.5rem 1.1rem;
+  border-radius: var(--rayon);
+  border: 1px solid var(--trait);
+  background: var(--surface);
+  font-weight: 600;
+  text-align: center;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-principal {
+  background: var(--bleu);
+  border-color: var(--bleu);
+  color: var(--sur-bleu);
+}
+
+.btn-danger {
+  color: var(--rouge);
+  border-color: currentColor;
+  background: transparent;
+}
+
+.btn-discret {
+  border-color: transparent;
+  background: transparent;
+  color: var(--bleu);
+  padding-inline: 0.5rem;
+}
+
+.btn[disabled] {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+
+.btn-large {
+  width: 100%;
+}
+
+.btn-icone {
+  min-width: 3rem;
+  min-height: 3rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  font-size: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Puces (aujourd'hui / hier…) et segments (Dépense / Entrée / Virement) */
+.puces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.puce {
+  min-height: 2.5rem;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--trait);
+  background: var(--surface);
+  font-size: 0.9375rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+}
+
+.puce[aria-pressed="true"] {
+  background: var(--bleu-pale);
+  border-color: var(--bleu);
+  color: var(--bleu);
+  font-weight: 600;
+}
+
+.segments {
+  display: flex;
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 0.2rem;
+  gap: 0.2rem;
+}
+
+.segments button {
+  flex: 1;
+  min-height: 2.6rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-weight: 600;
+  color: var(--encre-douce);
+  padding: 0.2rem 0.6rem;
+}
+
+.segments button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--encre);
+  box-shadow: var(--ombre);
+}
+
+.segments button[data-sens="depense"][aria-pressed="true"] {
+  color: var(--rouge);
+}
+
+.segments button[data-sens="revenu"][aria-pressed="true"] {
+  color: var(--vert);
+}
+
+.segments button[data-sens="virement"][aria-pressed="true"] {
+  color: var(--neutre);
+}
+
+/* ============================== MISE EN PAGE ============================== */
+
+.appli {
+  min-height: 100vh;
+}
+
+.vue {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1rem min(1rem, 4vw) calc(6.5rem + env(safe-area-inset-bottom)); /* marges limitées en grand texte : place au contenu */
+  outline: none;
+}
+
+.bandeaux {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 0 min(1rem, 4vw);
+}
+
+.bandeaux:empty {
+  display: none;
+}
+
+.bandeau {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem 0.6rem 1rem;
+  border-radius: var(--rayon);
+  background: var(--bleu-pale);
+  color: var(--encre);
+}
+
+.bandeau p {
+  flex: 1 1 12rem;
+}
+
+.bandeau-attention {
+  background: var(--attention-fond);
+}
+
+.bandeau .btn {
+  min-height: 2.6rem;
+}
+
+.entete-vue {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.section {
+  margin-top: 1.75rem;
+}
+
+.section > h2 {
+  margin-bottom: 0.5rem;
+}
+
+.titre-ligne {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+
+.bloc {
+  background: var(--surface);
+  border-radius: var(--rayon);
+  border: 1px solid var(--trait);
+}
+
+/* Barre d'onglets en bas (téléphone) */
+.onglets {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: end;
+  padding: 0.25rem 0.25rem calc(0.25rem + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--trait);
+}
+
+.onglet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  min-height: min(3.25rem, 13vw);
+  border: 0;
+  background: transparent;
+  color: var(--encre-douce);
+  font-size: min(0.75rem, 3vw); /* même en grand texte, « Opérations » tient dans son onglet */
+  font-weight: 600;
+  padding: 0.2rem 0;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.onglet-icone {
+  font-size: min(1.25rem, 5.5vw);
+  line-height: 1;
+  filter: grayscale(1);
+  opacity: 0.75;
+}
+
+.onglet[aria-current="page"] {
+  color: var(--bleu);
+}
+
+.onglet[aria-current="page"] .onglet-icone {
+  filter: none;
+  opacity: 1;
+}
+
+.onglet-plus {
+  justify-self: center;
+  width: min(3.75rem, 15vw);
+  height: min(3.75rem, 15vw);
+  min-height: 0;
+  margin-top: -1.4rem;
+  border-radius: 50%;
+  background: var(--bleu);
+  color: var(--sur-bleu);
+  font-size: min(2.25rem, 9vw);
+  font-weight: 400;
+  line-height: 1;
+  box-shadow: var(--ombre);
+  border: 3px solid var(--fond);
+}
+
+/* ============================== ACCUEIL ============================== */
+
+.solde-principal {
+  padding: 0.5rem 0 0;
+}
+
+.solde-nom {
+  color: var(--encre-douce);
+  font-weight: 600;
+}
+
+.solde-chiffre {
+  font-size: min(2.6rem, 11vw); /* le solde tient sur une ligne, même en grand texte */
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.solde-chiffre.negatif {
+  color: var(--rouge);
+}
+
+.solde-avenir {
+  margin-top: 0.2rem;
+  color: var(--encre-douce);
+  font-size: 0.9375rem;
+}
+
+.liste-comptes {
+  margin-top: 1rem;
+}
+
+.ligne-compte {
+  display: flex;
+  flex-wrap: wrap; /* écran étroit : le solde passe sous le nom plutôt que de le couper */
+  align-items: center;
+  gap: 0.1rem min(0.75rem, 3vw);
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0.5rem min(1rem, 4vw);
+  border: 0;
+  background: transparent;
+  text-align: left;
+  border-bottom: 1px solid var(--trait);
+}
+
+.ligne-compte:last-child {
+  border-bottom: 0;
+}
+
+.ligne-compte .op-icone {
+  flex: none;
+  width: min(2.25rem, 9vw);
+}
+
+.ligne-compte .op-titre {
+  flex: 1 1 7rem;
+  min-width: 0;
+}
+
+.ligne-compte .montant {
+  margin-left: auto;
+}
+
+/* La signature de l'appli : le mois posé comme une addition, avec son trait. */
+.addition {
+  padding: 0.85rem 1rem 0.9rem;
+}
+
+.addition-ligne {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.15rem 0;
+}
+
+.addition-ligne .montant {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.addition-total {
+  margin-top: 0.45rem;
+  padding-top: 0.5rem;
+  border-top: 2px solid var(--encre);
+}
+
+.addition-total .montant {
+  font-size: 1.375rem;
+  font-weight: 750;
+}
+
+.addition-note {
+  margin-top: 0.4rem;
+  font-size: 0.875rem;
+  color: var(--encre-douce);
+}
+
+.vide {
+  padding: 1.25rem 1rem;
+  text-align: center;
+  color: var(--encre-douce);
+}
+
+.vide strong {
+  display: block;
+  color: var(--encre);
+  margin-bottom: 0.25rem;
+}
+
+/* ============================== OPÉRATIONS ============================== */
+
+.nav-mois {
+  display: grid;
+  grid-template-columns: 3rem 1fr 3rem;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.nav-mois h1 {
+  text-align: center;
+  font-size: 1.125rem;
+}
+
+.nav-mois .btn-icone {
+  font-size: 1.1rem;
+  color: var(--bleu);
+}
+
+.resume-mois {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(6rem, 100%), 1fr)); /* en grand texte, les 3 montants s'empilent au lieu d'être coupés */
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.resume-mois div {
+  min-width: 0;
+}
+
+.resume-mois .montant {
+  display: block;
+  text-align: left;
+  font-weight: 650;
+}
+
+.filtres {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.filtres-selects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.filtres-selects select {
+  flex: 1 1 9rem;
+  min-width: 0;
+}
+
+.jour {
+  margin-top: 1rem;
+}
+
+.jour-entete {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0 0.25rem 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 650;
+  color: var(--encre-douce);
+}
+
+.liste-ops {
+  overflow: hidden;
+}
+
+.ligne-op {
+  display: grid;
+  grid-template-columns: min(2.25rem, 9vw) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: min(0.75rem, 3vw);
+  width: 100%;
+  min-height: 3.5rem;
+  padding: 0.45rem min(1rem, 4vw) 0.45rem min(0.75rem, 3vw);
+  border: 0;
+  border-bottom: 1px solid var(--trait);
+  background: transparent;
+  text-align: left;
+}
+
+.ligne-op:last-child {
+  border-bottom: 0;
+}
+
+.ligne-op:active {
+  background: var(--surface-2);
+}
+
+.op-icone {
+  font-size: min(1.5rem, 7vw); /* l'émoji reste dans sa colonne, même en grand texte */
+  line-height: 1;
+  text-align: center;
+}
+
+.op-texte {
+  min-width: 0;
+}
+
+.op-sous-titre {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.op-titre {
+  display: -webkit-box; /* 2 lignes au plus : un libellé long passe à la ligne au lieu d'être coupé net */
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-hyphens: auto;
+  hyphens: auto;
+  font-weight: 600;
+}
+
+.op-sous-titre {
+  font-size: 0.8125rem;
+  color: var(--encre-douce);
+}
+
+.op-montant {
+  font-weight: 650;
+}
+
+.etiquette {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0 0.4rem;
+  border-radius: 0.35rem;
+  background: var(--surface-2);
+  color: var(--encre-douce);
+  font-size: 0.75rem;
+  font-weight: 600;
+  vertical-align: 0.1em;
+}
+
+.etiquette-avenir {
+  background: var(--attention-fond);
+  color: var(--attention);
+}
+
+/* ============================== STATS ============================== */
+
+.stat-ligne {
+  display: grid;
+  grid-template-columns: min(2rem, 8vw) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.25rem min(0.75rem, 3vw);
+  padding: 0.55rem min(1rem, 4vw) 0.55rem min(0.75rem, 3vw);
+  border-bottom: 1px solid var(--trait);
+}
+
+.stat-ligne:last-child {
+  border-bottom: 0;
+}
+
+.stat-barre {
+  grid-column: 2 / 4;
+  display: block;
+  width: 100%;
+  height: 0.4rem;
+}
+
+.stat-barre .fond-barre {
+  fill: var(--surface-2);
+}
+
+.stat-barre .barre-sortie {
+  fill: var(--rouge);
+}
+
+.stat-barre .barre-entree {
+  fill: var(--vert);
+}
+
+/* ============================== RÉGLAGES ============================== */
+
+.reglage {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--trait);
+}
+
+.reglage:last-child {
+  border-bottom: 0;
+}
+
+.reglage > p + .puces,
+.reglage > p + .segments,
+.reglage > p + .options,
+.reglage > p + .actions {
+  margin-top: 0.6rem;
+}
+
+.reglage-bouton {
+  display: grid;
+  grid-template-columns: min(2rem, 8vw) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: min(0.75rem, 3vw);
+  width: 100%;
+  min-height: 3.5rem;
+  padding: 0.6rem min(1rem, 4vw) 0.6rem min(0.75rem, 3vw);
+  border: 0;
+  border-bottom: 1px solid var(--trait);
+  background: transparent;
+  text-align: left;
+}
+
+.reglage-bouton:last-child {
+  border-bottom: 0;
+}
+
+.reglage-bouton .op-icone {
+  font-size: min(1.35rem, 6.5vw);
+}
+
+.options {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  min-height: 3rem;
+  padding: 0.55rem 0.25rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+.option input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0.15rem 0 0;
+  flex: none;
+  accent-color: var(--bleu);
+}
+
+.taille-texte {
+  display: grid;
+  grid-template-columns: 3rem 1fr 3rem;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.taille-texte output {
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.taille-texte .btn {
+  padding: 0;
+  font-size: 1.25rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.a-propos p + p {
+  margin-top: 0.4rem;
+}
+
+/* ============================== CHAMPS ============================== */
+
+.champ {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.9rem;
+}
+
+.champ > span:first-child {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.champ-aide {
+  font-size: 0.8125rem;
+  color: var(--encre-douce);
+}
+
+.champ-erreur {
+  font-size: 0.875rem;
+  color: var(--rouge);
+  font-weight: 600;
+}
+
+input[type="text"],
+input[type="search"],
+input[type="date"],
+select,
+textarea {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--trait);
+  background: var(--surface);
+  color: var(--encre);
+}
+
+textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.champ-montant {
+  display: grid;
+  grid-template-columns: 1fr 3rem;
+  gap: 0.4rem;
+}
+
+.champ-montant input {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.champ-montant .btn {
+  padding: 0;
+}
+
+.choix-icones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.choix-icones .puce {
+  font-size: 1.35rem;
+  min-width: 3rem;
+  justify-content: center;
+}
+
+/* ============================== CALQUE (saisie, sous-écrans, guide) ============================== */
+
+.calque {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--fond);
+  display: flex;
+  flex-direction: column;
+}
+
+.calque[hidden] {
+  display: none;
+}
+
+.ecran {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 40rem;
+  height: 100%;
+  margin: 0 auto;
+  background: var(--fond);
+}
+
+.ecran-entete {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) 3rem;
+  align-items: center;
+  gap: 0.25rem;
+  padding: calc(0.4rem + env(safe-area-inset-top)) 0.5rem 0.4rem;
+}
+
+.ecran-entete h1 {
+  text-align: center;
+  font-size: 1.0625rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ecran-corps {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 1rem 1rem;
+}
+
+.ecran-pied {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem calc(0.6rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--trait);
+  background: var(--surface);
+}
+
+.ecran-pied .btn {
+  flex: 1;
+}
+
+/* ---------- Saisie rapide ----------
+   Tout l'écran tient sur un téléphone, même avec un grand texte :
+   les tailles sont en « em » à partir d'une taille de base qui suit le réglage « taille du texte »
+   tant que la largeur de l'écran le permet (au-delà, l'écran déborderait sur les côtés).
+   Seule la grille des catégories rétrécit et défile ; si vraiment tout ne tient pas, l'écran entier défile. */
+
+.saisie {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 34rem;
+  height: 100%;
+  margin: 0 auto;
+  padding: calc(0.35em + env(safe-area-inset-top)) 0.75em calc(0.5em + env(safe-area-inset-bottom));
+  gap: 0.45em;
+  background: var(--fond);
+  font-size: min(1rem, 4.4vw, 2.6vh); /* suit la taille du texte tant que l'écran (largeur ET hauteur) le permet */
+  overflow-y: auto;
+}
+
+.saisie > * {
+  flex: none; /* rien ne s'écrase : ni le montant, ni le pavé */
+}
+
+.saisie-haut {
+  display: grid;
+  grid-template-columns: 2.75em minmax(0, 1fr);
+  align-items: center;
+  gap: 0.25em;
+}
+
+.saisie .btn-icone {
+  min-width: 2.75em;
+  min-height: 2.75em;
+  font-size: 1.25em;
+}
+
+.saisie-ligne.saisie-puces {
+  flex-wrap: nowrap; /* une seule ligne de puces ; si l'écran est trop étroit, elle défile sur le côté */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.saisie-puces::-webkit-scrollbar {
+  display: none;
+}
+
+.saisie-puces > * {
+  flex: none;
+}
+
+.puce-texte {
+  display: inline-block;
+  max-width: 7em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.saisie .segments button {
+  min-height: 2.75em;
+  min-width: 0;
+  padding: 0.2em 0.4em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.saisie-montant {
+  text-align: center;
+  font-size: min(2.75em, 7.5vh);
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  padding: 0.1em 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.saisie-montant.long {
+  font-size: min(2em, 6vh);
+}
+
+/* Les messages pendant une saisie se posent SUR le montant (zone sans bouton) : jamais sur un bouton. */
+.saisie-montant-zone {
+  position: relative;
+}
+
+.saisie-statut {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.25em 0.35em 0.25em 0.85em;
+  border-radius: var(--rayon);
+  background: var(--encre);
+  color: var(--fond);
+  box-shadow: var(--ombre);
+  font-size: 0.875em;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+}
+
+.saisie-statut p {
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.saisie-statut .btn {
+  min-height: 2.5em;
+  padding: 0.3em 0.8em;
+  font-size: 1em;
+  background: transparent;
+  border-color: currentColor;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.saisie-statut.erreur {
+  background: var(--rouge);
+  color: #fff;
+}
+
+.saisie-montant.vide-montant {
+  color: var(--encre-douce);
+  opacity: 0.55;
+}
+
+.saisie-montant.secoue {
+  animation: secouer 0.35s ease;
+}
+
+@keyframes secouer {
+  20%,
+  60% {
+    transform: translateX(-8px);
+  }
+  40%,
+  80% {
+    transform: translateX(8px);
+  }
+}
+
+.saisie-ligne {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  align-items: center;
+}
+
+.saisie .puce {
+  min-height: 2.6em;
+  padding: 0.25em 0.8em;
+  font-size: 0.9375em;
+}
+
+.saisie-ligne select {
+  width: auto;
+  min-height: 2.6em;
+  max-width: 100%;
+  padding: 0.25em 2em 0.25em 0.75em;
+  border-radius: 999px;
+  font-size: 0.9375em;
+}
+
+.puce-date {
+  position: relative;
+}
+
+.puce-date input[type="date"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  opacity: 0;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+
+.saisie-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4em;
+}
+
+.saisie-details input,
+.saisie-details select {
+  min-height: 2.75em;
+  font-size: 1em;
+}
+
+.saisie-details .large {
+  grid-column: 1 / -1;
+}
+
+.saisie > .grille {
+  flex: 1 1 0;
+  min-height: min(9.5em, 22vh); /* au moins 1 à 2 rangées de catégories, sans jamais pousser le pavé hors de l'écran */
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5em, 1fr));
+  grid-auto-rows: min-content;
+  gap: 0.4em;
+  padding: 0.15em;
+  align-content: start;
+}
+
+.tuile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25em;
+  min-height: 4.6em;
+  padding: 0.4em 0.2em;
+  border-radius: var(--rayon);
+  border: 1px solid var(--trait);
+  background: var(--surface);
+  font-size: 0.75em;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  min-width: 0;
+}
+
+.tuile-icone {
+  font-size: 2em;
+  line-height: 1;
+}
+
+.tuile-nom {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  -webkit-hyphens: auto; /* « Rembourse-ments » plutôt que « Remboursem/ents » (césure française : Chrome 87+, Safari) */
+  hyphens: auto;
+  max-width: 100%;
+}
+
+.tuile[aria-pressed="true"] {
+  border-color: var(--bleu);
+  background: var(--bleu-pale);
+  box-shadow: inset 0 0 0 1px var(--bleu);
+}
+
+.saisie > .virement-comptes {
+  flex: 1 1 0;
+  min-height: min(9.5em, 22vh);
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 0.25em;
+}
+
+.saisie-actions {
+  display: flex;
+  gap: 0.5em;
+}
+
+.saisie-actions:empty {
+  display: none;
+}
+
+.saisie-actions .btn {
+  flex: 1;
+  min-height: 3em;
+  font-size: 1em;
+}
+
+.saisie-actions p {
+  font-size: 0.875em;
+}
+
+@media (max-height: 640px) {
+  .saisie-actions .astuce {
+    display: none; /* petit écran : la place va aux catégories */
+  }
+}
+
+.pave {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4em;
+}
+
+.touche {
+  height: clamp(44px, 7.2vh, 4em); /* jamais moins de 44 px : un vrai bouton sous le pouce */
+  border: 0;
+  border-radius: var(--rayon-touche);
+  background: var(--surface);
+  box-shadow: 0 1px 0 var(--trait), 0 2px 0 rgb(30 42 58 / 0.06);
+  font-size: min(1.6em, 4.2vh);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.touche:active {
+  background: var(--surface-2);
+  transform: translateY(1px);
+}
+
+/* ---------- Guide du 1er lancement ---------- */
+
+.guide-corps {
+  flex: 1;
+  overflow-y: auto;
+  padding: calc(1.5rem + env(safe-area-inset-top)) 1.25rem 1rem;
+}
+
+.guide-titre {
+  font-size: 1.6rem;
+  font-weight: 750;
+  line-height: 1.2;
+  margin-bottom: 0.75rem;
+}
+
+.guide-etapes {
+  color: var(--encre-douce);
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.guide-texte + .guide-texte {
+  margin-top: 0.6rem;
+}
+
+.promesses {
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.promesses li {
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.promesses li span:first-child {
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.logo-guide {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 1.1rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--ombre);
+}
+
+.guide-pied {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem calc(0.9rem + env(safe-area-inset-bottom));
+}
+
+.guide-pied-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* ============================== TOAST ET DIALOGUE ============================== */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  z-index: 60;
+  transform: translateX(-50%);
+  width: min(30rem, calc(100% - 1.5rem));
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.6rem 0.6rem 1rem;
+  border-radius: var(--rayon);
+  background: var(--encre);
+  color: var(--fond);
+  box-shadow: var(--ombre);
+  font-weight: 600;
+}
+
+.toast[hidden] {
+  display: none;
+}
+
+.toast {
+  pointer-events: none; /* un simple message ne bloque jamais un toucher : il passe au travers */
+}
+
+.toast.avec-action {
+  pointer-events: auto;
+}
+
+.toast p {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast .btn {
+  min-height: 2.6rem;
+  background: transparent;
+  border-color: currentColor;
+  color: var(--fond);
+  white-space: nowrap;
+}
+
+.toast.erreur {
+  background: var(--rouge);
+  color: #fff;
+}
+
+
+.dialogue {
+  width: min(26rem, calc(100% - 2rem));
+  padding: 1.25rem;
+  border: 0;
+  border-radius: var(--rayon);
+  background: var(--surface);
+  color: var(--encre);
+  box-shadow: var(--ombre);
+}
+
+.dialogue::backdrop {
+  background: rgb(10 15 20 / 0.45);
+}
+
+.dialogue h2 {
+  font-size: 1.125rem;
+  margin-bottom: 0.5rem;
+}
+
+.dialogue p + p {
+  margin-top: 0.5rem;
+}
+
+.dialogue-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+/* ============================== GRAND ÉCRAN (PC) ============================== */
+
+@media (min-width: 60rem) {
+  .onglets {
+    inset: 0 auto 0 0;
+    width: 6.5rem;
+    grid-template-columns: 1fr;
+    grid-auto-rows: min-content;
+    align-content: start;
+    gap: 0.25rem;
+    padding: 1rem 0.25rem;
+    border-top: 0;
+    border-right: 1px solid var(--trait);
+  }
+
+  .onglet-plus {
+    order: -1;
+    margin: 0 auto 0.75rem;
+  }
+
+  .appli {
+    padding-left: 6.5rem;
+  }
+
+  .vue {
+    max-width: 68rem;
+    padding: 1.5rem 2rem 3rem;
+  }
+
+  .bandeaux {
+    max-width: 68rem;
+    padding: 0 2rem;
+  }
+
+  .colonnes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0 2.5rem;
+    align-items: start;
+  }
+
+  .colonnes > .section,
+  .colonnes > .section:first-child,
+  .colonnes > div > .section:first-child {
+    margin-top: 0;
+  }
+
+  .toast {
+    bottom: 1.5rem;
+    left: calc(50% + 3.25rem);
+  }
+
+  .calque {
+    background: rgb(10 15 20 / 0.45);
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+  }
+
+  .calque .ecran,
+  .calque .saisie {
+    height: min(100%, 52rem);
+    border-radius: var(--rayon);
+    box-shadow: var(--ombre);
+    overflow: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saisie-montant.secoue {
+    animation: none;
+  }
+
+  .btn:active,
+  .touche:active {
+    transform: none;
+  }
+}

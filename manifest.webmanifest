@@ -1,0 +1,33 @@
+{
+  "id": "./",
+  "name": "Ma Compta Perso",
+  "short_name": "Ma Compta",
+  "description": "Mes comptes perso : simple, privé, hors ligne.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f4f3",
+  "theme_color": "#f2f4f3",
+  "categories": ["finance"],
+  "icons": [
+    { "src": "icones/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icones/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icones/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nouvelle dépense",
+      "short_name": "➖ Dépense",
+      "url": "./?saisie=depense",
+      "icons": [{ "src": "icones/raccourci-depense-96.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Nouvelle entrée",
+      "short_name": "➕ Entrée",
+      "url": "./?saisie=entree",
+      "icons": [{ "src": "icones/raccourci-entree-96.png", "sizes": "96x96", "type": "image/png" }]
+    }
+  ]
+}
