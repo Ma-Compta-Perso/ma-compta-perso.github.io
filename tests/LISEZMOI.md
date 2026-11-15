@@ -42,6 +42,11 @@ jour (faite une seule fois au 1er lancement d'une nouvelle version ; jamais pour
 onglet ; retour en arrière réversible, même depuis le guide ; si le téléphone est plein, l'appli démarre quand même
 et la copie est retentée). Chaque nouveau test a été vérifié : il ÉCHOUE si on remet le bug.
 
+v1.03 — Ajoutés : les contrastes, mesurés dans le navigateur avec les couleurs qu'il calcule vraiment, en clair et
+en sombre (automatiques ou choisis dans les Réglages) : 4,5:1 au moins pour un texte, 3:1 pour une forme à repérer
+(étoile allumée, bord d'une zone de saisie, anneau de focus) ; et « Revenir à l'état d'avant la dernière
+restauration » lancé depuis le guide, qui ne remet plus l'ancien n° de version. Chacun ÉCHOUE si on remet le défaut.
+
 S'y ajoutent les tests issus de la relecture indépendante du code (chacun a été vérifié : il ÉCHOUE si on
 remet le bug) : « ↶ Annuler » jamais sous le doigt par erreur, double toucher (jamais 2 comptes, jamais 2
 retours arrière), sauvegarde d'exemple restaurée par erreur puis effacée (la copie de sécurité survit),

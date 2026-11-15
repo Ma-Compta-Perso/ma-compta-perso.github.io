@@ -10,6 +10,7 @@
 # mode sombre, aucun défilement horizontal, aucune erreur de console, aucun appel réseau extérieur,
 # et le même n° de version partout.
 # v1.01 — + partager l'appli, bouton « Plus tard ». v1.02 — + donner son avis, soutenir l'appli, copie avant mise à jour.
+# v1.03 — + contrastes mesurés (clair et sombre), retour d'avant restauration lancé depuis le guide.
 # Toutes les données sont FABRIQUÉES ici : jamais de vraies données.
 
 import argparse
@@ -1089,6 +1090,89 @@ def test_copie_avant_mise_a_jour(nav, srv):
     s2.fermer()
 
 
+MESURER_CONTRASTES = """() => {
+  const rgb = (s) => s.match(/[\\d.]+/g).slice(0, 3).map(Number);
+  const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    const [r, g, b] = rgb(c); return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const zone = document.createElement("div");
+  document.body.append(zone);
+  // Une couleur de variable, lue telle que le navigateur la calcule (style posé par le CSSOM : permis par la règle de sécurité).
+  const couleur = (variable) => { const e = document.createElement("span"); e.style.color = `var(${variable})`; zone.append(e); return getComputedStyle(e).color; };
+  const element = (html) => { const t = document.createElement("template"); t.innerHTML = html; const e = t.content.firstElementChild; zone.append(e); return getComputedStyle(e); };
+  const fond = getComputedStyle(document.body).backgroundColor;
+  const mesures = [];
+  const texte = (nom, a, b) => mesures.push({ nom, r: ratio(a, b), seuil: 4.5 });
+  const forme = (nom, a, b) => mesures.push({ nom, r: ratio(a, b), seuil: 3 });
+  for (const [a, b] of [["--encre", "--fond"], ["--encre", "--surface"], ["--encre-douce", "--surface"], ["--encre-douce", "--fond"],
+      ["--encre-douce", "--surface-2"], ["--sur-bleu", "--bleu"], ["--bleu", "--fond"], ["--bleu", "--surface"], ["--encre", "--bleu-pale"],
+      ["--bleu", "--bleu-pale"], ["--rouge", "--surface"], ["--vert", "--surface"], ["--attention", "--attention-fond"], ["--fond", "--encre"]]) {
+    texte(`${a} sur ${b}`, couleur(a), couleur(b));
+  }
+  const toast = element('<div class="toast erreur"><p>Erreur</p></div>');
+  texte("message court d'erreur", toast.color, toast.backgroundColor);
+  const statut = element('<p class="saisie-statut erreur">Erreur</p>');
+  texte("message d'erreur dans la saisie", statut.color, statut.backgroundColor);
+  forme("étoile allumée sur le fond", element('<button type="button" class="etoile" aria-pressed="true">★</button>').color, fond);
+  const champ = element("<textarea></textarea>");
+  forme("bord d'une zone de saisie sur la carte", champ.borderTopColor, couleur("--surface"));
+  forme("bord d'une zone de saisie sur le fond", champ.borderTopColor, fond);
+  forme("anneau de focus sur le fond", couleur("--bleu"), fond);
+  zone.remove();
+  return { theme: getComputedStyle(document.documentElement).colorScheme, mesures };
+}"""
+
+
+def test_contrastes(nav, srv):
+    """v1.03 — Contrastes mesurés DANS le navigateur, avec les couleurs qu'il calcule vraiment, dans les 4 cas :
+    clair et sombre automatiques, sombre choisi dans les Réglages, clair choisi alors que le téléphone est en sombre.
+    Texte : 4,5:1 au moins ; formes à repérer (étoile, bord de champ, focus) : 3:1 au moins (règles WCAG)."""
+    for sombre, theme_choisi, attendu in [(False, None, "light"), (True, None, "dark"), (False, "sombre", "dark"), (True, "clair", "light")]:
+        s = Session(nav, srv, sombre=sombre)
+        page = s.ouvrir()
+        page.wait_for_selector(".guide-titre")
+        if theme_choisi:
+            page.evaluate("(t) => { document.documentElement.dataset.theme = t; }", theme_choisi)
+        resultat = page.evaluate(MESURER_CONTRASTES)
+        assert resultat["theme"] == attendu, resultat["theme"]
+        faibles = [f"{m['nom']} : {m['r']:.2f}:1 (il faut {m['seuil']})" for m in resultat["mesures"] if m["r"] < m["seuil"]]
+        assert not faibles, f"contraste trop faible ({attendu}, thème choisi : {theme_choisi}) : {faibles}"
+        s.fermer()
+
+
+def test_retour_restauration_depuis_le_guide(nav, srv):
+    """v1.03 — « Revenir à l'état d'avant la dernière restauration » lancé depuis le guide (appareil vide) :
+    le n° de format et la version deviennent ceux d'aujourd'hui, pas ceux de la vieille copie. Sinon, le lancement
+    suivant croyait à une mise à jour et refaisait, à tort, la copie 🛟 « d'avant la mise à jour »."""
+    version = re.search(r'const VERSION = "([\d.]+)"', (RACINE / "app.js").read_text(encoding="utf-8")).group(1)
+    s = Session(nav, srv)
+    page = s.ouvrir()
+    guide(page)
+    saisir(page, "9", "def-courses")
+    page.evaluate(
+        """async () => {
+          const C = await import("./calcul.js");
+          const S = await import("./stockage.js");
+          const d = await S.chargerTout();
+          const sauvegarde = C.construireSauvegarde(d, { versionAppli: "1.01", appareil: "", maintenant: new Date().toISOString(), exemple: false });
+          await S.ecrireCopieSecurite("avant-restauration", { sauvegarde, meta: { ...d.meta, version_appli: "1.01" } });
+          await S.toutEffacer();
+        }"""
+    )
+    page.reload()
+    page.wait_for_selector(".guide-titre")
+    page.click('[data-action="annuler-restauration"]')
+    page.click('#dialogue [data-reponse="oui"]')
+    page.wait_for_selector(".solde-chiffre")
+    base = s.base()
+    assert [o["montant"] for o in base["operations"] if not o["supprime"]] == [-900]
+    assert base["meta"]["version_appli"] == version and base["meta"]["schema"] == 1, base["meta"]
+    page.reload()
+    page.wait_for_selector(".solde-chiffre")
+    assert page.evaluate(COPIE_MAJ) is None, "le retour en arrière a fait croire à une mise à jour"
+    s.fermer()
+
+
 def test_installable(nav, srv):
     """On demande à Chrome lui-même (son protocole de débogage) si l'appli est installable."""
     s = Session(nav, srv)
@@ -1214,6 +1298,8 @@ def main():
             ("avis", lambda: test_avis(nav, srv)),  # v1.02
             ("soutien", lambda: test_soutien(nav, srv)),  # v1.02
             ("copie avant mise à jour", lambda: test_copie_avant_mise_a_jour(nav, srv)),  # v1.02
+            ("contrastes", lambda: test_contrastes(nav, srv)),  # v1.03
+            ("retour depuis le guide", lambda: test_retour_restauration_depuis_le_guide(nav, srv)),  # v1.03
             ("parcours complet", lambda: test_parcours_complet(nav, srv)),
             ("virement", lambda: test_virement(nav, srv)),
             ("mode bouton", lambda: test_mode_bouton(nav, srv)),

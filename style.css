@@ -21,6 +21,8 @@
   --attention: #8a5300;
   --attention-fond: #fbf0d9;
   --danger-fond: #fbe5e3;
+  --etoile: #9a6f00; /* v1.03 — étoile allumée : doré foncé, 4,1:1 sur le fond (#e2a400 ne faisait que 2:1 en clair) */
+  --trait-champ: #76808b; /* v1.03 — bord des zones de saisie : 3,6:1 au moins (--trait, 1,3:1, se voyait à peine) */
   --ombre: 0 1px 2px rgb(30 42 58 / 0.08), 0 4px 16px rgb(30 42 58 / 0.08);
   --rayon: 0.75rem;
   --rayon-touche: 1rem;
@@ -45,6 +47,8 @@
     --attention: #ffcc80;
     --attention-fond: #3b2c12;
     --danger-fond: #3e1d1b;
+    --etoile: #e2a400; /* v1.03 — en sombre, le doré clair reste très lisible (8,3:1) */
+    --trait-champ: #74808c; /* v1.03 — bord des zones de saisie en sombre : 4:1 au moins */
     --ombre: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.35);
     color-scheme: dark;
   }
@@ -66,6 +70,8 @@
   --attention: #ffcc80;
   --attention-fond: #3b2c12;
   --danger-fond: #3e1d1b;
+  --etoile: #e2a400; /* v1.03 — idem quand le sombre est choisi dans les Réglages */
+  --trait-champ: #74808c; /* v1.03 — idem */
   --ombre: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.35);
   color-scheme: dark;
 }
@@ -905,7 +911,7 @@ a.btn-principal {
 }
 
 .etoile[aria-pressed="true"] {
-  color: #e2a400; /* v1.02 — une étoile allumée : doré, lisible en clair comme en sombre */
+  color: var(--etoile); /* v1.03 — doré foncé en clair, doré clair en sombre : bien visible dans les deux */
 }
 
 /* v1.02 — Soutenir l'appli */
@@ -953,7 +959,7 @@ textarea {
   min-height: 3rem;
   padding: 0.55rem 0.75rem;
   border-radius: 0.6rem;
-  border: 1px solid var(--trait);
+  border: 1px solid var(--trait-champ); /* v1.03 — un bord bien visible : on voit où écrire (les séparateurs gardent --trait) */
   background: var(--surface);
   color: var(--encre);
 }
@@ -1184,7 +1190,7 @@ textarea {
 
 .saisie-statut.erreur {
   background: var(--rouge);
-  color: #fff;
+  color: var(--fond); /* v1.03 — le blanc sur le rose du mode sombre ne faisait que 2,2:1 ; ainsi 5,9:1 en clair, 8,3:1 en sombre */
 }
 
 .saisie-montant.vide-montant {
@@ -1483,7 +1489,7 @@ textarea {
 
 .toast.erreur {
   background: var(--rouge);
-  color: #fff;
+  color: var(--fond); /* v1.03 — même raison : lisible en clair comme en sombre */
 }
 
 

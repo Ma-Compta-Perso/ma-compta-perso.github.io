@@ -5,7 +5,7 @@
 import * as C from "./calcul.js";
 import * as S from "./stockage.js";
 
-const VERSION = "1.02"; // v1.02 — ⚠️ le même n° est dans sw.js (CACHE) et dans le nom du zip : un test le vérifie.
+const VERSION = "1.03"; // v1.03 — ⚠️ le même n° est dans sw.js (CACHE) et dans le nom du zip : un test le vérifie.
 const ADRESSE_APPLI = "https://ma-compta-perso.github.io/"; // v1.01 — l'adresse publique, la même que dans le QR code icones/qr-ma-compta.svg
 // v1.02 — L'éditeur (Rocco) : où arrivent les avis, et son compte PayPal pour les dons. Choix du 11/11/2026 : son
 // adresse perso « pour l'instant ». Pour la changer (adresse dédiée, page Tipeee…) : ici, et nulle part ailleurs.
@@ -1799,7 +1799,9 @@ async function annulerRestauration() {
   if (!ok) return;
   const ancienne = copie.contenu.meta || {};
   const copieActuelle = etat.meta ? { cle: "avant-restauration", contenu: { sauvegarde: sauvegardeActuelle(), meta: etat.meta } } : null;
-  const metaEnPlus = { ...(etat.meta ? {} : ancienne), derniere_sauvegarde: ancienne.derniere_sauvegarde ?? null, exemple: Boolean(ancienne.exemple) };
+  // v1.03 — n° de format et version TOUJOURS ceux d'aujourd'hui : depuis le guide (appareil vide), l'ancienne « meta » les
+  // remettait à leur valeur d'avant (fausse migration au 1er changement de format, copie 🛟 d'avant mise à jour écrasée).
+  const metaEnPlus = { ...(etat.meta ? {} : ancienne), schema: C.SCHEMA, version_appli: VERSION, derniere_sauvegarde: ancienne.derniere_sauvegarde ?? null, exemple: Boolean(ancienne.exemple) };
   try {
     await appliquerSauvegarde(v.sauvegarde, metaEnPlus, copieActuelle); // copie de l'état actuel ET retour arrière : tout ou rien
   } catch (e) {
